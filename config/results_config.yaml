@@ -1,0 +1,7 @@
+# config/results_config.yaml
+results:
+  base_directory: "results"
+  figure_quality: 300
+  model_compression: 3
+  auto_cleanup_days: 30
+  max_file_size_mb: 100

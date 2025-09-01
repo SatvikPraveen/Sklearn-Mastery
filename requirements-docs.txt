@@ -1,0 +1,19 @@
+# Documentation dependencies
+# File Location: requirements-docs.txt
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0
+mkdocs-mermaid2-plugin>=1.1.0
+mkdocs-git-revision-date-localized-plugin>=1.2.0
+mkdocs-minify-plugin>=0.7.0
+mkdocs-redirects>=1.2.0
+pygments>=2.15.0
+pymdown-extensions>=10.0.0
+markdown>=3.4.0
+jinja2>=3.1.0
+pyyaml>=6.0
+
+# Optional but recommended
+mkdocs-awesome-pages-plugin>=2.9.0
+mkdocs-macros-plugin>=1.0.0
+mkdocs-include-markdown-plugin>=6.0.0
+mkdocs-git-authors-plugin>=0.7.0
