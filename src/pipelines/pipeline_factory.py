@@ -1,5 +1,33 @@
 """Advanced pipeline factory for creating optimized ML pipelines."""
 
+import sys
+from pathlib import Path
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.settings import settings
+    from ..config.logging_config import LoggerMixin
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.settings import settings
+    from config.logging_config import LoggerMixin
+
+try:
+    from .custom_transformers import (
+        OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
+        AdvancedImputer, FeatureScaler, PipelineDebugger
+    )
+    from .model_selection import AdvancedModelSelector
+except ImportError:
+    # Fallback for direct imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from pipelines.custom_transformers import (
+        OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
+        AdvancedImputer, FeatureScaler, PipelineDebugger
+    )
+    from pipelines.model_selection import AdvancedModelSelector
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Union, Any, Tuple
@@ -8,14 +36,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 from sklearn.base import BaseEstimator
-
-from .custom_transformers import (
-    OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
-    AdvancedImputer, FeatureScaler, PipelineDebugger
-)
-from .model_selection import AdvancedModelSelector
-from ..config.settings import settings
-from ..config.logging_config import LoggerMixin
 
 
 class PipelineFactory(LoggerMixin):
@@ -409,3 +429,125 @@ class PipelineFactory(LoggerMixin):
 
 # Export classes
 __all__ = ['PipelineFactory']
+
+# Additional factory classes for backward compatibility and flexibility
+
+class AutoMLPipelineBuilder(LoggerMixin):
+    """Automated ML pipeline builder."""
+    
+    def __init__(self, task_type: str = 'classification'):
+        self.task_type = task_type
+        self.factory = PipelineFactory()
+    
+    def build(self, X, y, **kwargs):
+        """Build automatic pipeline."""
+        return self.factory.create_classification_pipeline() if self.task_type == 'classification' else self.factory.create_regression_pipeline()
+
+
+class ClassificationPipelineFactory(LoggerMixin):
+    """Factory for classification pipelines."""
+    
+    def __init__(self):
+        self.factory = PipelineFactory()
+    
+    def create_standard_pipeline(self):
+        """Create standard classification pipeline."""
+        return self.factory.create_classification_pipeline()
+    
+    def create_advanced_pipeline(self):
+        """Create advanced classification pipeline."""
+        return self.factory.create_classification_pipeline(advanced=True)
+
+
+class RegressionPipelineFactory(LoggerMixin):
+    """Factory for regression pipelines."""
+    
+    def __init__(self):
+        self.factory = PipelineFactory()
+    
+    def create_standard_pipeline(self):
+        """Create standard regression pipeline."""
+        return self.factory.create_regression_pipeline()
+    
+    def create_advanced_pipeline(self):
+        """Create advanced regression pipeline."""
+        return self.factory.create_regression_pipeline(advanced=True)
+
+
+class CustomPipelineBuilder(LoggerMixin):
+    """Custom pipeline builder with step control."""
+    
+    def __init__(self):
+        self.steps = []
+    
+    def add_step(self, name: str, transformer):
+        """Add a step to the pipeline."""
+        self.steps.append((name, transformer))
+        return self
+    
+    def build(self):
+        """Build the pipeline."""
+        if not self.steps:
+            raise ValueError("No steps added to pipeline")
+        return Pipeline(self.steps)
+
+
+class PipelineConfig(LoggerMixin):
+    """Configuration for pipelines."""
+    
+    def __init__(self):
+        self.config = {
+            'preprocessing': True,
+            'feature_selection': True,
+            'scaling': True,
+            'random_state': 42
+        }
+    
+    def set_option(self, key: str, value):
+        """Set configuration option."""
+        self.config[key] = value
+        return self
+    
+    def get_option(self, key: str):
+        """Get configuration option."""
+        return self.config.get(key)
+
+
+class PipelineOptimizer(LoggerMixin):
+    """Optimize pipeline hyperparameters."""
+    
+    def __init__(self, pipeline: Pipeline, param_grid: Dict[str, list]):
+        self.pipeline = pipeline
+        self.param_grid = param_grid
+        self.best_params = None
+        self.best_score = None
+    
+    def optimize(self, X, y, cv: int = 5, scoring: str = 'accuracy'):
+        """Optimize pipeline."""
+        from sklearn.model_selection import GridSearchCV
+        
+        gs = GridSearchCV(
+            self.pipeline,
+            self.param_grid,
+            cv=cv,
+            scoring=scoring,
+            n_jobs=-1
+        )
+        gs.fit(X, y)
+        
+        self.best_params = gs.best_params_
+        self.best_score = gs.best_score_
+        
+        return self.pipeline.set_params(**self.best_params)
+
+
+# Update __all__ export
+__all__ = [
+    'PipelineFactory',
+    'AutoMLPipelineBuilder',
+    'ClassificationPipelineFactory',
+    'RegressionPipelineFactory',
+    'CustomPipelineBuilder',
+    'PipelineConfig',
+    'PipelineOptimizer'
+]
