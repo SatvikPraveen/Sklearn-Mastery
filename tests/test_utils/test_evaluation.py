@@ -16,19 +16,11 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from utils.evaluation import (
+from evaluation import (
     ModelEvaluator,
-    CrossValidator,
-    MetricsCalculator,
-    PerformanceComparator,
-    LearningCurveAnalyzer,
+    StatisticalTester,
     ValidationCurveAnalyzer,
-    ResidualAnalyzer,
-    FeatureImportanceAnalyzer,
-    ConfusionMatrixAnalyzer,
-    ROCAnalyzer,
-    PrecisionRecallAnalyzer,
-    CalibrationAnalyzer
+    ModelVisualizationSuite
 )
 
 
