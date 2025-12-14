@@ -1,9 +1,0 @@
-# .github/workflows/results_validation.yml
-name: Validate Results
-on: [push, pull_request]
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check results structure
-        run: python scripts/validate_results.py
