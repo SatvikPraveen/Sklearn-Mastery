@@ -2,7 +2,8 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 import os
 
 
