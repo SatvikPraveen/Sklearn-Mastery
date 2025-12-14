@@ -1,5 +1,16 @@
 """Custom transformers for advanced pipeline construction."""
 
+import sys
+from pathlib import Path
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.logging_config import LoggerMixin
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.logging_config import LoggerMixin
+
 import numpy as np
 import pandas as pd
 from typing import Union, List, Optional, Dict, Any, Tuple
@@ -11,8 +22,6 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn.decomposition import PCA
 from sklearn.impute import KNNImputer
 import warnings
-
-from ..config.logging_config import LoggerMixin
 
 
 class OutlierRemover(BaseEstimator, TransformerMixin, LoggerMixin):
@@ -875,3 +884,216 @@ class PipelineDebugger(BaseEstimator, TransformerMixin, LoggerMixin):
         # Log all information
         for line in info_lines:
             getattr(self.logger, self.log_level.lower())(line)
+
+class FeatureSelector(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Select specific features."""
+    
+    def __init__(self, features: List[Union[str, int]] = None):
+        self.features = features
+    
+    def fit(self, X, y=None):
+        if self.features is None and hasattr(X, 'columns'):
+            self.features = list(X.columns)
+        return self
+    
+    def transform(self, X):
+        if hasattr(X, 'columns'):
+            return X[self.features]
+        else:
+            return X[:, self.features]
+
+
+class DateTimeTransformer(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Transform datetime features."""
+    
+    def __init__(self, columns: List[str] = None):
+        self.columns = columns
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        import pandas as pd
+        X = X.copy()
+        if self.columns:
+            for col in self.columns:
+                if isinstance(X, pd.DataFrame):
+                    X[col] = pd.to_datetime(X[col])
+        return X
+
+
+class CategoricalEncoder(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Encode categorical variables."""
+    
+    def __init__(self, columns: List[str] = None, method: str = 'onehot'):
+        self.columns = columns
+        self.method = method
+        self.encoder = None
+    
+    def fit(self, X, y=None):
+        if self.method == 'onehot':
+            from sklearn.preprocessing import OneHotEncoder
+            self.encoder = OneHotEncoder(sparse_output=False)
+            if self.columns and hasattr(X, 'iloc'):
+                self.encoder.fit(X[self.columns])
+            else:
+                self.encoder.fit(X)
+        return self
+    
+    def transform(self, X):
+        if self.encoder:
+            if self.columns and hasattr(X, 'iloc'):
+                return self.encoder.transform(X[self.columns])
+            else:
+                return self.encoder.transform(X)
+        return X
+
+
+class NumericTransformer(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Transform numeric features."""
+    
+    def __init__(self, columns: List[str] = None, operation: str = 'normalize'):
+        self.columns = columns
+        self.operation = operation
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        X = X.copy()
+        if self.operation == 'normalize':
+            from sklearn.preprocessing import MinMaxScaler
+            scaler = MinMaxScaler()
+            if self.columns:
+                X[self.columns] = scaler.fit_transform(X[self.columns])
+            else:
+                X = scaler.fit_transform(X)
+        return X
+
+
+class TextTransformer(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Transform text features."""
+    
+    def __init__(self, columns: List[str] = None):
+        self.columns = columns
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        vectorizer = TfidfVectorizer()
+        if self.columns:
+            return vectorizer.fit_transform(X[self.columns[0]])
+        return X
+
+
+class MissingValueHandler(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Handle missing values."""
+    
+    def __init__(self, strategy: str = 'mean'):
+        self.strategy = strategy
+        self.imputer = None
+    
+    def fit(self, X, y=None):
+        from sklearn.impute import SimpleImputer
+        self.imputer = SimpleImputer(strategy=self.strategy)
+        self.imputer.fit(X)
+        return self
+    
+    def transform(self, X):
+        if self.imputer:
+            return self.imputer.transform(X)
+        return X
+
+
+class CustomScaler(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Custom feature scaling."""
+    
+    def __init__(self, method: str = 'standard'):
+        self.method = method
+        self.scaler = None
+    
+    def fit(self, X, y=None):
+        if self.method == 'standard':
+            from sklearn.preprocessing import StandardScaler
+            self.scaler = StandardScaler()
+        elif self.method == 'minmax':
+            from sklearn.preprocessing import MinMaxScaler
+            self.scaler = MinMaxScaler()
+        self.scaler.fit(X)
+        return self
+    
+    def transform(self, X):
+        if self.scaler:
+            return self.scaler.transform(X)
+        return X
+
+
+class BinningTransformer(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Bin continuous features."""
+    
+    def __init__(self, columns: List[str] = None, bins: int = 5):
+        self.columns = columns
+        self.bins = bins
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        import pandas as pd
+        X = X.copy()
+        if self.columns:
+            for col in self.columns:
+                if hasattr(X, 'iloc'):
+                    X[col] = pd.cut(X[col], bins=self.bins)
+        return X
+
+
+class PolynomialFeatureCreator(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Create polynomial features."""
+    
+    def __init__(self, degree: int = 2):
+        self.degree = degree
+        self.poly = None
+    
+    def fit(self, X, y=None):
+        from sklearn.preprocessing import PolynomialFeatures
+        self.poly = PolynomialFeatures(degree=self.degree)
+        self.poly.fit(X)
+        return self
+    
+    def transform(self, X):
+        if self.poly:
+            return self.poly.transform(X)
+        return X
+
+
+class TargetEncoder(BaseEstimator, TransformerMixin, LoggerMixin):
+    """Encode target values."""
+    
+    def __init__(self, columns: List[str] = None):
+        self.columns = columns
+        self.target_map = {}
+    
+    def fit(self, X, y=None):
+        if y is not None and self.columns:
+            import pandas as pd
+            for col in self.columns:
+                if hasattr(X, 'iloc'):
+                    self.target_map[col] = X[col].map(y.to_dict() if hasattr(y, 'to_dict') else y)
+        return self
+    
+    def transform(self, X):
+        X = X.copy()
+        if self.columns:
+            for col in self.columns:
+                if col in self.target_map:
+                    if hasattr(X, 'iloc'):
+                        X[col] = X[col].map(self.target_map[col])
+        return X
+
+
+# Alias for backward compatibility
+DataValidator = type('DataValidator', (BaseEstimator,), {})
+FeatureUnion = type('FeatureUnion', (BaseEstimator,), {})
