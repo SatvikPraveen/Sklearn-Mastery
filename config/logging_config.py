@@ -5,8 +5,13 @@ import logging.config
 import sys
 from pathlib import Path
 from typing import Dict, Any
-from rich.logging import RichHandler
-from rich.console import Console
+
+try:
+    from rich.logging import RichHandler
+    from rich.console import Console
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
 
 
 def setup_logging(
@@ -36,13 +41,13 @@ def setup_logging(
         },
     }
     
-    # Configure handlers
+    # Configure handlers - use RichHandler if available, otherwise standard StreamHandler
     handlers = {
         "console": {
-            "class": "rich.logging.RichHandler" if rich_console else "logging.StreamHandler",
+            "class": "logging.StreamHandler",
             "level": log_level,
             "formatter": "simple",
-            "stream": sys.stdout,
+            "stream": "ext://sys.stdout",
         },
         "file": {
             "class": "logging.handlers.RotatingFileHandler",
