@@ -1,5 +1,18 @@
 """Advanced model selection utilities and strategies."""
 
+import sys
+from pathlib import Path
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.settings import settings, ModelDefaults
+    from ..config.logging_config import LoggerMixin
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.settings import settings, ModelDefaults
+    from config.logging_config import LoggerMixin
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Union, Any, Tuple, Callable
@@ -10,13 +23,16 @@ from sklearn.model_selection import (
 )
 from sklearn.base import BaseEstimator, clone
 from sklearn.metrics import make_scorer
-import optuna
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
 
-from ..config.settings import settings, ModelDefaults
-from ..config.logging_config import LoggerMixin
+# Optional dependency
+try:
+    import optuna
+    HAS_OPTUNA = True
+except ImportError:
+    HAS_OPTUNA = False
 
 
 class AdvancedModelSelector(LoggerMixin):
@@ -197,6 +213,9 @@ class AdvancedModelSelector(LoggerMixin):
         n_trials: int
     ) -> Tuple[BaseEstimator, Dict[str, Any], float]:
         """Optimize hyperparameters using Optuna."""
+        
+        if not HAS_OPTUNA:
+            raise ImportError("Optuna is required for 'optuna' optimization method. Install it with: pip install optuna")
         
         def objective(trial):
             # Sample parameters
@@ -977,3 +996,225 @@ __all__ = [
     'ValidationCurveAnalyzer',
     'AutoMLSelector'
 ]
+
+# Additional model selection classes for backward compatibility
+
+class ModelSelectionPipeline(LoggerMixin):
+    """Pipeline for model selection and evaluation."""
+    
+    def __init__(self, models: List[BaseEstimator], cv: int = 5):
+        self.models = models
+        self.cv = cv
+        self.results = {}
+    
+    def evaluate_all(self, X, y):
+        """Evaluate all models."""
+        for i, model in enumerate(self.models):
+            scores = cross_val_score(model, X, y, cv=self.cv, scoring='accuracy')
+            self.results[f'Model_{i}'] = {
+                'mean': np.mean(scores),
+                'std': np.std(scores),
+                'scores': scores
+            }
+        return self.results
+    
+    def best_model(self):
+        """Get the best model."""
+        if not self.results:
+            raise ValueError("No results. Call evaluate_all() first")
+        best = max(self.results.items(), key=lambda x: x[1]['mean'])
+        return best
+
+
+class AutoModelSelector(LoggerMixin):
+    """Automatically select best model."""
+    
+    def __init__(self, models: List[BaseEstimator]):
+        self.models = models
+        self.best_model = None
+    
+    def select(self, X, y, cv: int = 5):
+        """Select best model."""
+        best_score = -np.inf
+        for model in self.models:
+            scores = cross_val_score(model, X, y, cv=cv)
+            if np.mean(scores) > best_score:
+                best_score = np.mean(scores)
+                self.best_model = model
+        return self.best_model
+
+
+class ModelComparator(LoggerMixin):
+    """Compare multiple models."""
+    
+    def __init__(self, models: Dict[str, BaseEstimator]):
+        self.models = models
+        self.comparison_results = None
+    
+    def compare(self, X, y, cv: int = 5):
+        """Compare models."""
+        results = {}
+        for name, model in self.models.items():
+            scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')
+            results[name] = {
+                'mean': np.mean(scores),
+                'std': np.std(scores),
+                'min': np.min(scores),
+                'max': np.max(scores)
+            }
+        self.comparison_results = results
+        return results
+
+
+class HyperparameterOptimizer(LoggerMixin):
+    """Optimize hyperparameters."""
+    
+    def __init__(self, model: BaseEstimator, param_grid: Dict[str, list]):
+        self.model = model
+        self.param_grid = param_grid
+        self.best_params = None
+    
+    def optimize(self, X, y, cv: int = 5):
+        """Optimize hyperparameters."""
+        gs = GridSearchCV(self.model, self.param_grid, cv=cv, n_jobs=-1)
+        gs.fit(X, y)
+        self.best_params = gs.best_params_
+        return gs.best_estimator_
+
+
+class CrossValidationPipeline(LoggerMixin):
+    """Cross-validation pipeline."""
+    
+    def __init__(self, model: BaseEstimator, cv: int = 5):
+        self.model = model
+        self.cv = cv
+        self.cv_results = None
+    
+    def run(self, X, y):
+        """Run cross-validation."""
+        scores = cross_val_score(self.model, X, y, cv=self.cv, scoring='accuracy')
+        self.cv_results = {
+            'scores': scores,
+            'mean': np.mean(scores),
+            'std': np.std(scores)
+        }
+        return self.cv_results
+
+
+class ModelEnsemblePipeline(LoggerMixin):
+    """Pipeline for ensemble model selection."""
+    
+    def __init__(self, models: List[BaseEstimator]):
+        self.models = models
+    
+    def create_voting_ensemble(self):
+        """Create voting ensemble."""
+        from sklearn.ensemble import VotingClassifier
+        return VotingClassifier(
+            estimators=[(f'model_{i}', m) for i, m in enumerate(self.models)],
+            voting='soft'
+        )
+
+
+class PerformanceTracker(LoggerMixin):
+    """Track model performance."""
+    
+    def __init__(self):
+        self.performance_history = []
+    
+    def track(self, model_name: str, metrics: Dict[str, float]):
+        """Track performance metrics."""
+        self.performance_history.append({
+            'model': model_name,
+            'metrics': metrics,
+            'timestamp': time.time()
+        })
+    
+    def get_history(self):
+        """Get performance history."""
+        return self.performance_history
+
+
+# Update __all__ export
+__all__ = [
+    'AdvancedModelSelector',
+    'MultiObjectiveSelector',
+    'NestedCrossValidation',
+    'LearningCurveAnalyzer',
+    'ValidationCurveAnalyzer',
+    'AutoMLSelector',
+    'ModelSelectionPipeline',
+    'AutoModelSelector',
+    'ModelComparator',
+    'HyperparameterOptimizer',
+    'CrossValidationPipeline',
+    'ModelEnsemblePipeline',
+    'PerformanceTracker'
+]
+
+
+class ModelRegistry(LoggerMixin):
+    """Registry for managing models."""
+    
+    def __init__(self):
+        self.models = {}
+    
+    def register(self, name: str, model: BaseEstimator):
+        """Register a model."""
+        self.models[name] = model
+    
+    def get(self, name: str) -> BaseEstimator:
+        """Get a registered model."""
+        return self.models.get(name)
+    
+    def list_models(self):
+        """List all registered models."""
+        return list(self.models.keys())
+
+
+class BayesianOptimizer(LoggerMixin):
+    """Bayesian optimization for hyperparameter tuning."""
+    
+    def __init__(self, model: BaseEstimator, param_space: Dict[str, list]):
+        self.model = model
+        self.param_space = param_space
+    
+    def optimize(self, X, y, n_calls: int = 10):
+        """Optimize using Bayesian search."""
+        # Simple implementation - in practice, would use scikit-optimize
+        from sklearn.model_selection import RandomizedSearchCV
+        
+        search = RandomizedSearchCV(
+            self.model,
+            self.param_space,
+            n_iter=n_calls,
+            cv=5,
+            n_jobs=-1,
+            random_state=42
+        )
+        search.fit(X, y)
+        return search.best_estimator_, search.best_params_
+
+
+class GridSearchPipeline(LoggerMixin):
+    """Pipeline for grid search."""
+    
+    def __init__(self, model: BaseEstimator, param_grid: Dict[str, list]):
+        self.model = model
+        self.param_grid = param_grid
+    
+    def search(self, X, y, cv: int = 5):
+        """Perform grid search."""
+        gs = GridSearchCV(
+            self.model,
+            self.param_grid,
+            cv=cv,
+            n_jobs=-1
+        )
+        gs.fit(X, y)
+        return {
+            'best_estimator': gs.best_estimator_,
+            'best_params': gs.best_params_,
+            'best_score': gs.best_score_,
+            'cv_results': gs.cv_results_
+        }
