@@ -1,5 +1,18 @@
 """Utility functions and helper methods for the sklearn-mastery project."""
 
+import sys
+from pathlib import Path as PathLib
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.settings import settings
+    from ..config.logging_config import LoggerMixin
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
+    from config.settings import settings
+    from config.logging_config import LoggerMixin
+
 import numpy as np
 import pandas as pd
 from typing import Union, List, Dict, Any, Tuple, Optional
@@ -14,9 +27,6 @@ import warnings
 from sklearn.base import BaseEstimator
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-
-from ..config.settings import settings
-from ..config.logging_config import LoggerMixin
 
 
 class DataUtils(LoggerMixin):
