@@ -1,5 +1,16 @@
 """Utility decorators for performance monitoring and debugging."""
 
+import sys
+from pathlib import Path as PathLib
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.logging_config import get_logger
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
+    from config.logging_config import get_logger
+
 import time
 import functools
 import psutil
@@ -10,8 +21,6 @@ from pathlib import Path
 import pickle
 import hashlib
 import json
-
-from ..config.logging_config import get_logger
 
 
 def timing_decorator(func: Callable) -> Callable:
