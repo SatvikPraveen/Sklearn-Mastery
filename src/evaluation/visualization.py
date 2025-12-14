@@ -1,5 +1,21 @@
 """Advanced visualization tools for model evaluation and data analysis."""
 
+import sys
+from pathlib import Path
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.settings import settings
+    from ..config.logging_config import LoggerMixin
+    from .utils import ensure_binary_classification, safe_division
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.settings import settings
+    from config.logging_config import LoggerMixin
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from evaluation.utils import ensure_binary_classification, safe_division
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,10 +31,6 @@ from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
-
-from ..config.settings import settings
-from ..config.logging_config import LoggerMixin
-from .utils import ensure_binary_classification, safe_division
 
 
 class ModelVisualizationSuite(LoggerMixin):
