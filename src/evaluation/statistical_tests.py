@@ -1,14 +1,24 @@
 """Statistical significance testing and validation curve analysis."""
 
+import sys
+from pathlib import Path
+
+# Handle imports that work in both package and direct import contexts
+try:
+    from ..config.settings import settings
+    from ..config.logging_config import LoggerMixin
+except ImportError:
+    # Fallback for direct imports outside package context
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from config.settings import settings
+    from config.logging_config import LoggerMixin
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Union, Tuple, Any
 from sklearn.model_selection import validation_curve
 from sklearn.base import BaseEstimator
 import warnings
-
-from ..config.settings import settings
-from ..config.logging_config import LoggerMixin
 
 
 class StatisticalTester(LoggerMixin):
