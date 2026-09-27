@@ -1874,6 +1874,9 @@ class SyntheticDataGenerator(LoggerMixin):
     ) -> Union[Tuple[pd.DataFrame, np.ndarray], Tuple[pd.DataFrame, np.ndarray, List[str]]]:
         """Heterogeneous tabular data for preprocessing-pipeline demos.
 
+        Returns ``(X, y)`` by default; pass ``return_feature_types=True`` to also
+        receive the ``{column: kind}`` mapping as a third element.
+
         Columns are named ``num_i`` (float), ``cat_i`` (unordered
         :class:`pandas.CategoricalDtype`), ``ord_i`` (ordered categorical) and
         ``bin_i`` (``int`` in ``{0, 1}``). The target depends on every column

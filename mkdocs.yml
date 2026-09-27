@@ -10,9 +10,6 @@ edit_uri: edit/main/docs/
 copyright: MIT License &copy; Satvik Praveen
 
 # Build hooks live under docs/ but are not pages.
-exclude_docs: |
-  hooks/
-
 theme:
   name: material
   language: en
@@ -55,10 +52,6 @@ theme:
     - navigation.tracking
     - content.tooltips
     - announce.dismiss
-
-# Narrow logging filter for one known library-docstring warning; see the module docstring.
-hooks:
-  - docs/hooks/known_docstring_warnings.py
 
 plugins:
   - search

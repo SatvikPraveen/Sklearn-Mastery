@@ -28,6 +28,7 @@ underlying estimator raises ``ImportError`` unless :data:`HAS_XGBOOST` /
 from __future__ import annotations
 
 import inspect
+import time
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple, Type, Union
 
@@ -234,7 +235,9 @@ class ClassificationModel(ClassifierMixin, BaseEstimator, LoggerMixin):
         estimator = self._build_estimator()
         y_fit = self._encode(y)
         self.logger.debug("Fitting %s on X%s", type(estimator).__name__, getattr(X, "shape", ""))
+        start = time.perf_counter()
         estimator.fit(X, y_fit, **fit_params)
+        self.training_time_ = time.perf_counter() - start
         self.model_ = estimator
         self.classes_ = (
             self.label_encoder_.classes_ if self._encode_labels else np.asarray(estimator.classes_)
@@ -1548,12 +1551,28 @@ class ClassificationModels(LoggerMixin):
             raise TypeError("Custom models must subclass ClassificationModel.")
         cls._REGISTRY[name] = model_cls
 
+    def _instantiate(self, model_cls: Type[ClassificationModel], **params: Any) -> ClassificationModel:
+        """Build ``model_cls`` keeping only the constructor arguments it accepts.
+
+        Mirrors :class:`RegressionModels`: unsupported keyword arguments (for
+        example ``class_weight`` on a model without it) are dropped with a
+        warning instead of raising ``TypeError``.
+        """
+        accepted = set(model_cls().get_params())
+        dropped = sorted(set(params) - accepted)
+        if dropped:
+            self.logger.warning("%s ignores unsupported argument(s): %s", model_cls.__name__, dropped)
+        kept = {k: v for k, v in params.items() if k in accepted}
+        self.logger.debug("Creating %s with %s", model_cls.__name__, kept)
+        return model_cls(**kept)
+
     def get_model(self, name: str, **params: Any) -> ClassificationModel:
         """Instantiate a registered wrapper by name.
 
         Args:
             name: Registry key (see :meth:`available_models`).
-            **params: Constructor arguments for the wrapper.
+            **params: Constructor arguments; unsupported ones are dropped with
+                a warning.
 
         Returns:
             A new, unfitted wrapper.
@@ -1565,8 +1584,25 @@ class ClassificationModels(LoggerMixin):
             model_cls = self._REGISTRY[name]
         except KeyError as exc:
             raise KeyError(f"Unknown model {name!r}. Available: {sorted(self._REGISTRY)}") from exc
-        self.logger.debug("Creating %s with %s", model_cls.__name__, params)
-        return model_cls(**params)
+        return self._instantiate(model_cls, **params)
+
+    def train_model(
+        self, X: ArrayLike, y: ArrayLike, algorithm: str = "random_forest", **params: Any
+    ) -> Tuple[ClassificationModel, float]:
+        """Build and fit a wrapper in one call (parity with :meth:`RegressionModels.train_model`).
+
+        Args:
+            X: Training features.
+            y: Training labels.
+            algorithm: Registry key of the wrapper.
+            **params: Constructor arguments for the wrapper.
+
+        Returns:
+            ``(fitted_model, training_time_seconds)``.
+        """
+        model = self.get_model(algorithm, **params)
+        model.train(X, y)
+        return model, float(model.training_time_)
 
     def get_logistic_regression(self, **params: Any) -> LogisticRegressionModel:
         """Create a :class:`LogisticRegressionModel`."""
