@@ -433,14 +433,14 @@ class TestDimensionalityReductionIntegration:
                 # ICA might have slight variations due to convergence
                 np.testing.assert_array_almost_equal(
                     X1_transformed, X2_transformed, 
-                    f"Models {name1} and {name2} should produce similar results",
+                    err_msg=f"Models {name1} and {name2} should produce similar results",
                     decimal=3
                 )
             else:
                 # PCA should be exactly reproducible
                 np.testing.assert_array_almost_equal(
                     X1_transformed, X2_transformed, 
-                    f"Models {name1} and {name2} should produce identical results",
+                    err_msg=f"Models {name1} and {name2} should produce identical results",
                     decimal=10
                 )
     
@@ -460,7 +460,7 @@ class TestDimensionalityReductionIntegration:
             dot_product = np.dot(components, components.T)
             np.testing.assert_array_almost_equal(
                 dot_product, np.eye(5),
-                "PCA components should be orthogonal",
+                err_msg="PCA components should be orthogonal",
                 decimal=10
             )
         else:
