@@ -352,7 +352,9 @@ def bayesian_correlated_ttest(
         scores_b: Fold scores of algorithm B (aligned).
         rope: Half-width of the region of practical equivalence, on the metric
             scale (e.g. ``0.01`` for one accuracy point).
-        n_train, n_test, n_splits: Cross-validation geometry as in
+        n_train: Training-set size per fold.
+        n_test: Test-set size per fold.
+        n_splits: Alternative to sizes for plain k-fold, as in
             :func:`corrected_resampled_ttest`.
 
     Returns:

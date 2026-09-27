@@ -19,7 +19,7 @@ Example:
     >>> model = RidgeRegressionModel(alpha=1.0).train(X, y)
     >>> metrics = model.evaluate(X, y)
     >>> sorted(metrics)[:3]
-    ['explained_variance', 'mae', 'max_error']
+    `['explained_variance', 'mae', 'max_error']`
 """
 
 from __future__ import annotations

@@ -82,8 +82,10 @@ def bias_variance_decomposition(
 
     Args:
         estimator: Unfitted estimator (cloned every round).
-        X_train, y_train: Training data resampled with replacement each round.
-        X_test, y_test: Fixed evaluation set.
+        X_train: Training features, resampled with replacement each round.
+        y_train: Training targets.
+        X_test: Fixed evaluation features.
+        y_test: Fixed evaluation targets.
         loss: ``'mse'`` (regression) or ``'0-1'`` (classification).
         n_rounds: Bootstrap rounds.
         random_state: Seed for the bootstrap draws.

@@ -62,7 +62,13 @@ dev = [
   "plotly>=5.15",
   "imbalanced-learn>=0.10",
 ]
-docs = ["mkdocs>=1.5", "mkdocs-material>=9.0", "mkdocstrings[python]>=0.24"]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+  "mkdocs-autorefs>=1.2",
+  "pymdown-extensions>=10.8",
+]
 
 [project.urls]
 Homepage = "https://github.com/SatvikPraveen/Sklearn-Mastery"
