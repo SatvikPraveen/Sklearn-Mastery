@@ -30,16 +30,113 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.supervised.regression import RegressionModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+
+
+# ---------------------------------------------------------------------------
+# Small adapters between this narrative example and the sklearn_mastery API.
+# ---------------------------------------------------------------------------
+def _build_model(models: Any, algorithm: str, **kwargs: Any) -> Any:
+    """Instantiate a model wrapper, dropping kwargs the algorithm does not accept.
+
+    ``class_weight`` for example is meaningful for random forests and logistic
+    regression but not for gradient boosting or neural networks.
+    """
+    import inspect
+
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    wrapper_cls = type(models.get_model(algorithm))
+    accepted = inspect.signature(wrapper_cls.__init__).parameters
+    filtered = {k: v for k, v in kwargs.items() if k in accepted and v is not None}
+    model = models.get_model(algorithm, **filtered)
+    if algorithm in ('neural_network', 'logistic_regression', 'ridge', 'linear_regression'):
+        # Scale-sensitive learners get a standardiser in front of them.
+        model = make_pipeline(StandardScaler(), model)
+    if algorithm == 'neural_network' and isinstance(models, RegressionModels):
+        # Regression targets here are tiny (returns, PDs); standardise them for the MLP.
+        from sklearn.compose import TransformedTargetRegressor
+
+        model = TransformedTargetRegressor(regressor=model, transformer=StandardScaler())
+    return model
+
+
+def _train_model(models: Any, X: Any, y: Any, algorithm: str, **kwargs: Any) -> Tuple[Any, float]:
+    """Build and fit a wrapper; returns ``(fitted_model, training_seconds)``."""
+    import time
+
+    model = _build_model(models, algorithm, **kwargs)
+    start = time.perf_counter()
+    model.fit(X, y)
+    return model, time.perf_counter() - start
+
+
+def _classification_metrics(y_true: Any, y_pred: Any, y_proba: Any = None) -> Dict[str, float]:
+    """Classification metrics via MetricsCalculator (adds an ``f1_score`` alias)."""
+    metrics = MetricsCalculator(task_type='classification').calculate_all_metrics(
+        y_true, y_pred, y_proba=y_proba
+    )
+    metrics['f1_score'] = metrics['f1']
+    return metrics
+
+
+def _regression_metrics(y_true: Any, y_pred: Any) -> Dict[str, float]:
+    """Regression metrics via MetricsCalculator (adds an ``r2_score`` alias)."""
+    metrics = MetricsCalculator(task_type='regression').calculate_all_metrics(y_true, y_pred)
+    metrics['r2_score'] = metrics['r2']
+    return metrics
+
+
+def _encode_features(X: pd.DataFrame, columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """One-hot encode non-numeric columns so tree/linear models can consume them.
+
+    When ``columns`` is given the result is aligned to that column list (missing
+    dummies are filled with 0), so new data matches the training layout.
+    """
+    encoded = pd.get_dummies(X, dtype=float)
+    if columns is not None:
+        encoded = encoded.reindex(columns=columns, fill_value=0.0)
+    return encoded
+
+
+def _agg_to_nested_dict(agg: pd.DataFrame) -> Dict[str, Dict[str, Dict[Any, float]]]:
+    """Convert a multi-statistic groupby result into ``{column: {stat: {group: value}}}``."""
+    nested: Dict[str, Dict[str, Dict[Any, float]]] = {}
+    for col in agg.columns:
+        if isinstance(col, tuple):
+            nested.setdefault(col[0], {})[col[1]] = agg[col].to_dict()
+        else:
+            nested[col] = {'value': agg[col].to_dict()}
+    return nested
+
+
+def _regression_algorithm(models: Any, algorithm: str) -> str:
+    """Map classifier-only names onto their regression analogue (logistic -> ridge)."""
+    if isinstance(models, RegressionModels) and algorithm == 'logistic_regression':
+        return 'ridge'
+    return algorithm
+
+
 
 class AlgorithmicTradingSystem:
     """Complete algorithmic trading system with ML-based strategies."""
@@ -47,9 +144,9 @@ class AlgorithmicTradingSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize algorithmic trading system."""
         
-        self.config = config or {
-            'n_days': 1260,  # ~5 years of trading data (252 days/year)
-            'n_assets': 20,
+        defaults = {
+            'n_days': 504,  # ~2 years of trading data (252 days/year)
+            'n_assets': 10,
             'test_size': 0.2,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression', 'neural_network'],
@@ -64,6 +161,8 @@ class AlgorithmicTradingSystem:
                 'take_profit_pct': 0.15      # 15% take profit
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -173,7 +272,7 @@ class AlgorithmicTradingSystem:
         feature_cols = [col for col in df.columns if not col.startswith(('future_', 'target_')) 
                        and col not in ['date', 'asset_id']]
         
-        X = df[feature_cols].fillna(method='ffill').fillna(0)
+        X = df[feature_cols].ffill().fillna(0)
         
         print(f"✅ Generated {len(df):,} trading records")
         print(f"📊 Assets: {self.config['n_assets']}, Days: {self.config['n_days']}")
@@ -544,7 +643,7 @@ class AlgorithmicTradingSystem:
         }).round(4)
         
         patterns['asset_analysis'] = {
-            'performance_by_type': asset_performance.to_dict(),
+            'performance_by_type': _agg_to_nested_dict(asset_performance),
             'best_performing_type': X.groupby('asset_type')['daily_return'].mean().idxmax(),
             'most_volatile_type': X.groupby('asset_type')['volatility'].mean().idxmax()
         }
@@ -614,7 +713,8 @@ class AlgorithmicTradingSystem:
             
             # Remove rows with NaN targets
             valid_mask = target.notna()
-            X_clean = X[valid_mask]
+            X_clean = _encode_features(X[valid_mask])
+            self.model_feature_columns_ = list(X_clean.columns)
             target_clean = target[valid_mask]
             
             # Split data (time-aware split for financial data)
@@ -638,9 +738,9 @@ class AlgorithmicTradingSystem:
                 
                 try:
                     # Train model
-                    model, training_time = models.train_model(
+                    model, training_time = _train_model(models, 
                         X_train, y_train, 
-                        algorithm=algorithm,
+                        algorithm=_regression_algorithm(models, algorithm),
                         class_weight='balanced' if target_name == 'direction_prediction' else None
                     )
                     
@@ -652,11 +752,10 @@ class AlgorithmicTradingSystem:
                         y_pred_proba = model.predict_proba(X_test)
                     
                     # Evaluate model
-                    evaluator = ModelEvaluator()
                     if target_name == 'direction_prediction':
-                        metrics = evaluator.classification_metrics(y_test, y_pred, y_pred_proba)
+                        metrics = _classification_metrics(y_test, y_pred, y_pred_proba)
                     else:
-                        metrics = evaluator.regression_metrics(y_test, y_pred)
+                        metrics = _regression_metrics(y_test, y_pred)
                     
                     # Calculate trading performance
                     trading_metrics = self.calculate_trading_performance(
@@ -790,9 +889,11 @@ class AlgorithmicTradingSystem:
         
         daily_values = []
         
-        for idx, row in X_backtest.iterrows():
-            # Make prediction
-            signal = direction_model.predict([row.drop(['date', 'asset_id'], errors='ignore')])[0]
+        # Predict all signals in one batch using the training feature layout
+        X_backtest_encoded = _encode_features(X_backtest, self.model_feature_columns_)
+        signals = direction_model.predict(X_backtest_encoded)
+        
+        for (idx, row), signal in zip(X_backtest.iterrows(), signals):
             
             # Simulate trading return based on signal
             if signal == 'buy':
@@ -992,7 +1093,11 @@ class AlgorithmicTradingSystem:
                 ax11.tick_params(axis='x', rotation=45)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "algorithmic_trading.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Visualizations completed")
     

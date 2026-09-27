@@ -30,16 +30,26 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.supervised.regression import RegressionModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class CampaignOptimizer:
     """Complete marketing campaign optimization system."""
@@ -47,13 +57,19 @@ class CampaignOptimizer:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize campaign optimization system."""
         
-        self.config = config or {
-            'n_campaigns': 500,
-            'n_customers': 100000,
+        defaults = {
+            'n_campaigns': 120,      # ~4k daily performance records
+            'n_customers': 2000,
             'n_days': 365,
             'test_size': 0.2,
             'random_state': 42,
-            'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression', 'neural_network'],
+            # All objectives are continuous rates/amounts, so every model is a regressor
+            'algorithms': ['random_forest', 'gradient_boosting', 'ridge'],
+            'model_params': {
+                'random_forest': {'n_estimators': 50, 'max_depth': 10},
+                'gradient_boosting': {'n_estimators': 50, 'max_depth': 3},
+                'ridge': {'alpha': 1.0},
+            },
             'channels': ['email', 'social_media', 'search', 'display', 'tv', 'radio'],
             'campaign_types': ['awareness', 'consideration', 'conversion', 'retention'],
             'business_params': {
@@ -65,6 +81,8 @@ class CampaignOptimizer:
                 'attribution_window_days': 30
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -76,6 +94,26 @@ class CampaignOptimizer:
         self.campaign_data = None
         self.optimization_results = {}
         self.best_models = {}
+        self.model_feature_columns_ = None
+
+    def _encode_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """One-hot encode the categorical campaign attributes for modelling.
+
+        The raw feature frame keeps human-readable categories (channel,
+        creative type, ...) for the pattern analysis; models need a purely
+        numeric matrix. The column layout learned on the first call is reused
+        for every later call so scenario frames line up with the trained models.
+        """
+        # Columns computed directly from the targets (ROAS, CPC, CPA, ...) are
+        # kept for reporting but would leak the answer into the models.
+        leakage_cols = ['roas', 'cpc', 'cpa', 'efficiency_score', 'performance_trend',
+                        'rolling_ctr_7d', 'rolling_roas_7d']
+        X = X.drop(columns=[c for c in leakage_cols if c in X.columns])
+        categorical = X.select_dtypes(exclude=[np.number, 'bool']).columns.tolist()
+        X_enc = pd.get_dummies(X, columns=categorical, dtype=float)
+        if self.model_feature_columns_ is None:
+            self.model_feature_columns_ = X_enc.columns.tolist()
+        return X_enc.reindex(columns=self.model_feature_columns_, fill_value=0.0)
         
     def generate_campaign_dataset(self) -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
         """Generate comprehensive marketing campaign dataset."""
@@ -547,18 +585,16 @@ class CampaignOptimizer:
         for objective, target in targets.items():
             print(f"\nTraining models for {objective}...")
             
-            # Split data
+            # Split data (categoricals one-hot encoded for the models)
+            X_encoded = self._encode_features(X)
             X_train, X_test, y_train, y_test = self.data_loader.train_test_split(
-                X, target, test_size=self.config['test_size']
+                X_encoded, target, test_size=self.config['test_size']
             )
             
-            # Choose model type based on objective
-            if objective in ['ctr_optimization', 'conversion_optimization']:
-                # Use regression for rate optimization
-                models = RegressionModels()
-            else:
-                # Use regression for ROI and spend optimization
-                models = RegressionModels()
+            # Every objective (CTR, conversion rate, ROI, spend) is continuous,
+            # so the same regression toolkit serves all of them.
+            models = RegressionModels(random_state=self.config['random_state'])
+            evaluator = MetricsCalculator(task_type='regression')
             
             objective_results = {}
             
@@ -567,15 +603,16 @@ class CampaignOptimizer:
                 
                 # Train model
                 model, training_time = models.train_model(
-                    X_train, y_train, algorithm=algorithm
+                    X_train, y_train, algorithm=algorithm,
+                    **self.config['model_params'].get(algorithm, {})
                 )
                 
                 # Make predictions
                 y_pred = model.predict(X_test)
                 
                 # Evaluate model
-                evaluator = ModelEvaluator()
-                metrics = evaluator.regression_metrics(y_test, y_pred)
+                metrics = evaluator.calculate_all_metrics(y_test, y_pred)
+                metrics['r2_score'] = metrics['r2']
                 
                 # Calculate business impact
                 business_metrics = self.calculate_campaign_impact(
@@ -693,84 +730,67 @@ class CampaignOptimizer:
         print("🎯 Generating campaign optimization recommendations...")
         
         # Sample subset for optimization
-        sample_size = min(1000, len(X))
+        sample_size = min(500, len(X))
         X_sample = X.sample(n=sample_size, random_state=self.config['random_state'])
-        
-        optimizations = []
+        X_base = self._encode_features(X_sample)
         
         # Get best models for each objective
         best_models = {}
         for objective, obj_data in models_dict.items():
             best_models[objective] = obj_data['best_performance']['model']
         
-        for idx, row in X_sample.iterrows():
-            base_scenario = row.copy()
+        def predict_all(frame: pd.DataFrame) -> Dict[str, np.ndarray]:
+            """Score a whole scenario frame with every objective model at once."""
+            return {objective: np.asarray(model.predict(frame))
+                    for objective, model in best_models.items()}
+        
+        # Predict current performance for every sampled campaign-day
+        current_predictions = predict_all(X_base)
+        
+        # Scenario 1: Budget optimization
+        budget_opt = X_base.copy()
+        budget_opt['budget_utilization'] = np.minimum(1.0, budget_opt['budget_utilization'] + 0.1)
+        budget_opt['spend_intensity'] = budget_opt['budget_utilization']
+        
+        # Scenario 2: Creative optimization
+        creative_opt = X_base.copy()
+        creative_opt['creative_fatigue'] = np.minimum(1.0, creative_opt['creative_fatigue'] + 0.2)
+        creative_opt['engagement_score'] = np.minimum(100, creative_opt['engagement_score'] * 1.1)
+        
+        # Scenario 3: Timing optimization
+        timing_opt = X_base.copy()
+        timing_opt['market_seasonality'] = np.minimum(1.5, timing_opt['market_seasonality'] + 0.1)
+        timing_opt['holiday_boost'] = np.minimum(2.0, timing_opt['holiday_boost'] + 0.1)
+        
+        scenario_specs = [
+            ('Budget Optimized', 'Improved budget utilization', predict_all(budget_opt)),
+            ('Creative Optimized', 'Refreshed creative assets', predict_all(creative_opt)),
+            ('Timing Optimized', 'Optimized timing and seasonality', predict_all(timing_opt)),
+        ]
+        
+        optimizations = []
+        for i, idx in enumerate(X_sample.index):
+            current = {obj: float(pred[i]) for obj, pred in current_predictions.items()}
             
-            # Predict current performance
-            current_predictions = {}
-            for objective, model in best_models.items():
-                current_predictions[objective] = model.predict([row])[0]
-            
-            # Generate optimization scenarios
             scenarios = []
-            
-            # Scenario 1: Budget optimization
-            budget_opt = base_scenario.copy()
-            budget_opt['budget_utilization'] = min(1.0, budget_opt['budget_utilization'] + 0.1)
-            budget_opt['spend_intensity'] = budget_opt['budget_utilization']
-            
-            budget_predictions = {}
-            for objective, model in best_models.items():
-                budget_predictions[objective] = model.predict([budget_opt])[0]
-            
-            scenarios.append({
-                'scenario': 'Budget Optimized',
-                'predictions': budget_predictions,
-                'changes': 'Improved budget utilization',
-                'improvement_score': self._calculate_improvement_score(current_predictions, budget_predictions)
-            })
-            
-            # Scenario 2: Creative optimization
-            creative_opt = base_scenario.copy()
-            creative_opt['creative_fatigue'] = min(1.0, creative_opt['creative_fatigue'] + 0.2)
-            creative_opt['engagement_score'] = min(100, creative_opt['engagement_score'] * 1.1)
-            
-            creative_predictions = {}
-            for objective, model in best_models.items():
-                creative_predictions[objective] = model.predict([creative_opt])[0]
-            
-            scenarios.append({
-                'scenario': 'Creative Optimized',
-                'predictions': creative_predictions,
-                'changes': 'Refreshed creative assets',
-                'improvement_score': self._calculate_improvement_score(current_predictions, creative_predictions)
-            })
-            
-            # Scenario 3: Timing optimization
-            timing_opt = base_scenario.copy()
-            timing_opt['market_seasonality'] = min(1.5, timing_opt['market_seasonality'] + 0.1)
-            timing_opt['holiday_boost'] = min(2.0, timing_opt['holiday_boost'] + 0.1)
-            
-            timing_predictions = {}
-            for objective, model in best_models.items():
-                timing_predictions[objective] = model.predict([timing_opt])[0]
-            
-            scenarios.append({
-                'scenario': 'Timing Optimized',
-                'predictions': timing_predictions,
-                'changes': 'Optimized timing and seasonality',
-                'improvement_score': self._calculate_improvement_score(current_predictions, timing_predictions)
-            })
+            for scenario_name, changes, preds in scenario_specs:
+                scenario_pred = {obj: float(pred[i]) for obj, pred in preds.items()}
+                scenarios.append({
+                    'scenario': scenario_name,
+                    'predictions': scenario_pred,
+                    'changes': changes,
+                    'improvement_score': self._calculate_improvement_score(current, scenario_pred)
+                })
             
             # Select best optimization scenario
             best_scenario = max(scenarios, key=lambda x: x['improvement_score'])
             
             optimizations.append({
-                'campaign_id': row.get('campaign_id', f'C{idx:04d}'),
-                'current_ctr': current_predictions['ctr_optimization'],
-                'current_cvr': current_predictions['conversion_optimization'],
-                'current_roi': current_predictions['roi_optimization'],
-                'current_spend': current_predictions['spend_optimization'],
+                'campaign_id': X_sample.loc[idx].get('campaign_id', f'C{idx:04d}'),
+                'current_ctr': current['ctr_optimization'],
+                'current_cvr': current['conversion_optimization'],
+                'current_roi': current['roi_optimization'],
+                'current_spend': current['spend_optimization'],
                 'optimized_scenario': best_scenario['scenario'],
                 'optimized_ctr': best_scenario['predictions']['ctr_optimization'],
                 'optimized_cvr': best_scenario['predictions']['conversion_optimization'],
@@ -1081,7 +1101,11 @@ Key Recommendations:
         ax15.set_title('Campaign Optimization Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "campaign_optimization.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Campaign optimization visualizations completed")
     

@@ -29,16 +29,28 @@ from typing import Dict, Tuple, Any, List
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class MedicalDiagnosisSystem:
     """Complete medical diagnosis assistance system."""
@@ -46,8 +58,8 @@ class MedicalDiagnosisSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize medical diagnosis system."""
         
-        self.config = config or {
-            'n_patients': 5000,
+        defaults = {
+            'n_patients': 2500,
             'test_size': 0.2,
             'validation_size': 0.1,
             'random_state': 42,
@@ -57,6 +69,8 @@ class MedicalDiagnosisSystem:
             'clinical_validation': True,
             'confidence_threshold': 0.8
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -242,35 +256,38 @@ class MedicalDiagnosisSystem:
         # Configure models for medical diagnosis
         algorithms_to_test = {
             'Random Forest': models.get_random_forest(
-                n_estimators=200,
+                n_estimators=60,
                 max_depth=10,
                 min_samples_split=5,
                 class_weight='balanced',
                 random_state=self.config['random_state']
             ),
             'Gradient Boosting': models.get_gradient_boosting(
-                n_estimators=200,
+                n_estimators=60,
                 learning_rate=0.1,
                 max_depth=5,
                 random_state=self.config['random_state']
             ),
-            'SVM': models.get_svm(
+            # Distance/gradient based learners get standardised inputs
+            'SVM': make_pipeline(StandardScaler(), models.get_svm(
                 kernel='rbf',
                 probability=True,
                 class_weight='balanced',
                 random_state=self.config['random_state']
-            ),
-            'Logistic Regression': models.get_logistic_regression(
+            )),
+            'Logistic Regression': make_pipeline(StandardScaler(), models.get_logistic_regression(
                 class_weight='balanced',
+                max_iter=2000,
                 random_state=self.config['random_state']
-            )
+            ))
         }
         
         # Add ensemble model
         base_estimators = [
-            ('rf', models.get_random_forest(n_estimators=100, random_state=self.config['random_state'])),
-            ('gb', models.get_gradient_boosting(n_estimators=100, random_state=self.config['random_state'])),
-            ('lr', models.get_logistic_regression(random_state=self.config['random_state']))
+            ('rf', models.get_random_forest(n_estimators=40, random_state=self.config['random_state'])),
+            ('gb', models.get_gradient_boosting(n_estimators=40, random_state=self.config['random_state'])),
+            ('lr', make_pipeline(StandardScaler(), models.get_logistic_regression(
+                max_iter=2000, random_state=self.config['random_state'])))
         ]
         
         algorithms_to_test['Medical Ensemble'] = ensemble.get_voting_classifier(
@@ -286,15 +303,13 @@ class MedicalDiagnosisSystem:
             # Fit model
             model.fit(X_train, y_train)
             
-            # Validate model
-            val_performance = self.model_evaluator.evaluate_classification_model(
+            # Validate model (with a quick 3-fold CV on the training data)
+            val_performance = self._evaluate_diagnostic_model(
                 model, X_val, y_val, X_train, y_train, cv_folds=3
             )
             
             # Test model
-            test_performance = self.model_evaluator.evaluate_classification_model(
-                model, X_test, y_test
-            )
+            test_performance = self._evaluate_diagnostic_model(model, X_test, y_test)
             
             # Clinical validation
             clinical_metrics = self.perform_clinical_validation(
@@ -337,6 +352,39 @@ class MedicalDiagnosisSystem:
         self.test_data = (X_test, y_test)
         
         return model_results
+    
+    def _evaluate_diagnostic_model(self, model, X_eval: pd.DataFrame, y_eval: pd.Series,
+                                   X_train: pd.DataFrame = None, y_train: pd.Series = None,
+                                   cv_folds: int = 3) -> Dict[str, Any]:
+        """Multi-class evaluation (accuracy, weighted P/R/F1, one-vs-rest AUC).
+
+        The shared ``ModelPerformanceEvaluator`` helper assumes a binary
+        target, so the multi-disease diagnosis task uses this local variant
+        built on the toolkit's :class:`MetricsCalculator`.
+        """
+        from sklearn.metrics import confusion_matrix
+        from sklearn.model_selection import cross_val_score
+        
+        y_pred = model.predict(X_eval)
+        y_proba = model.predict_proba(X_eval) if hasattr(model, 'predict_proba') else None
+        
+        calculator = MetricsCalculator(task_type='classification', average='weighted')
+        metrics = calculator.calculate_all_metrics(y_eval, y_pred, y_proba=y_proba)
+        metrics['f1'] = metrics.get('f1', metrics.get('f1_score'))
+        if metrics.get('roc_auc') is not None:
+            metrics['auc'] = metrics['roc_auc']
+        metrics['confusion_matrix'] = confusion_matrix(y_eval, y_pred)
+        
+        if X_train is not None and y_train is not None:
+            cv_scores = cross_val_score(model, X_train, y_train, cv=cv_folds, scoring='accuracy')
+            metrics['cv_scores'] = cv_scores
+            metrics['cv_mean'] = float(cv_scores.mean())
+            metrics['cv_std'] = float(cv_scores.std())
+        
+        if hasattr(model, 'feature_importances_'):
+            metrics['feature_importance'] = model.feature_importances_
+        
+        return metrics
     
     def perform_clinical_validation(self, model, X_test: pd.DataFrame, y_test: pd.Series, model_name: str) -> Dict[str, Any]:
         """Perform clinical validation of the diagnostic model."""
@@ -518,7 +566,10 @@ class MedicalDiagnosisSystem:
         }
         
         print("✅ Clinical insights generated")
-        print(f"   Top clinical factor: {max(clinical_features.items(), key=lambda x: x[1])[0]}")
+        if clinical_features:
+            print(f"   Top clinical factor: {max(clinical_features.items(), key=lambda x: x[1])[0]}")
+        else:
+            print("   Top clinical factor: n/a (best model does not expose feature importances)")
         print(f"   Model interpretability: {'High' if insights['model_interpretability']['interpretable'] else 'Limited'}")
         
         return insights
@@ -644,7 +695,7 @@ def main():
     
     # Configuration for medical diagnosis
     config = {
-        'n_patients': 5000,
+        'n_patients': 2500,
         'target_diseases': ['Diabetes', 'Hypertension', 'Heart Disease', 'Respiratory Infection', 'Healthy'],
         'algorithms': ['random_forest', 'gradient_boosting', 'svm', 'ensemble'],
         'confidence_threshold': 0.8,

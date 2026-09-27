@@ -27,18 +27,27 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, Any, List
 from scipy.sparse import csr_matrix
-from scipy.spatial.distance import cosine
 import warnings
 warnings.filterwarnings('ignore')
+
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator
 
 class RecommendationSystem:
     """Complete recommendation system pipeline."""
@@ -46,7 +55,7 @@ class RecommendationSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize recommendation system."""
         
-        self.config = config or {
+        defaults = {
             'n_users': 1000,
             'n_items': 500,
             'n_interactions': 50000,
@@ -60,6 +69,8 @@ class RecommendationSystem:
                 'conversion_rate_baseline': 0.02
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -153,6 +164,9 @@ class RecommendationSystem:
         self.item_ids = user_item_df.columns.values
         self.user_item_matrix = user_item_matrix
         self.user_item_df = user_item_df
+        # Dense copy (users x items) for vectorised neighbourhood computations;
+        # the matrix is small enough for this to be cheap.
+        self.user_item_dense = user_item_df.to_numpy(dtype=float, copy=True)
         
         return user_item_matrix
     
@@ -204,7 +218,7 @@ class RecommendationSystem:
             """Get recommendations for a specific user."""
             
             # Get user's ratings
-            user_ratings = self.user_item_matrix[user_idx].toarray().flatten()
+            user_ratings = self.user_item_dense[user_idx].copy()
             
             # Find items user hasn't rated
             unrated_items = np.where(user_ratings == 0)[0]
@@ -212,26 +226,23 @@ class RecommendationSystem:
             if len(unrated_items) == 0:
                 return []
             
-            # Calculate predicted ratings for unrated items
-            predicted_ratings = []
+            # Calculate predicted ratings for unrated items (vectorised):
+            # each unrated item's score is the |similarity|-weighted average of
+            # the ratings given by the user's neighbours who rated that item.
+            ratings_matrix = self.user_item_dense
+            rated_mask = (ratings_matrix > 0).astype(float)
+            weights = np.abs(user_similarity[user_idx])
+            weighted_sum = weights @ ratings_matrix
+            weight_total = weights @ rated_mask
             
-            for item_idx in unrated_items:
-                # Find users who rated this item
-                item_raters = np.where(self.user_item_matrix[:, item_idx] > 0)[0]
-                
-                if len(item_raters) == 0:
-                    predicted_rating = self.user_item_df.mean().mean()  # Global average
-                else:
-                    # Calculate weighted average based on user similarity
-                    similarities = user_similarity[user_idx, item_raters]
-                    ratings = self.user_item_matrix[item_raters, item_idx].toarray().flatten()
-                    
-                    if np.sum(np.abs(similarities)) > 0:
-                        predicted_rating = np.average(ratings, weights=np.abs(similarities))
-                    else:
-                        predicted_rating = np.mean(ratings)
-                
-                predicted_ratings.append((item_idx, predicted_rating))
+            # Fallbacks: unweighted item mean when no similar neighbour rated the
+            # item, global average when nobody rated it at all.
+            n_raters = rated_mask.sum(axis=0)
+            item_mean = np.divide(ratings_matrix.sum(axis=0), n_raters,
+                                  out=np.full(ratings_matrix.shape[1], self.user_item_df.mean().mean()),
+                                  where=n_raters > 0)
+            predicted = np.divide(weighted_sum, weight_total, out=item_mean.copy(), where=weight_total > 0)
+            predicted_ratings = [(int(item_idx), float(predicted[item_idx])) for item_idx in unrated_items]
             
             # Sort by predicted rating and return top N
             predicted_ratings.sort(key=lambda x: x[1], reverse=True)
@@ -251,29 +262,15 @@ class RecommendationSystem:
         
         print("   Computing user similarities...")
         
-        n_users = self.user_item_matrix.shape[0]
-        user_similarity = np.zeros((n_users, n_users))
+        # Cosine similarity between user rating vectors, computed for every
+        # user at once with a vectorised kernel (a Python double loop over
+        # users is far too slow and was previously limited to a 100-user sample).
+        from sklearn.metrics.pairwise import cosine_similarity
         
-        # Calculate pairwise cosine similarities (sample for efficiency)
-        sample_size = min(100, n_users)  # Sample users for faster computation
-        user_indices = np.random.choice(n_users, sample_size, replace=False)
+        user_similarity = cosine_similarity(self.user_item_dense)
+        np.fill_diagonal(user_similarity, 0.0)  # a user is not their own neighbour
         
-        for i, user_i in enumerate(user_indices):
-            user_i_ratings = self.user_item_matrix[user_i].toarray().flatten()
-            
-            for j, user_j in enumerate(user_indices):
-                if i <= j:
-                    user_j_ratings = self.user_item_matrix[user_j].toarray().flatten()
-                    
-                    # Only consider items both users have rated
-                    common_items = (user_i_ratings > 0) & (user_j_ratings > 0)
-                    
-                    if np.sum(common_items) > 0:
-                        similarity = 1 - cosine(user_i_ratings[common_items], user_j_ratings[common_items])
-                        user_similarity[user_i, user_j] = similarity
-                        user_similarity[user_j, user_i] = similarity
-        
-        print(f"   Computed similarities for {sample_size} users")
+        print(f"   Computed similarities for {user_similarity.shape[0]} users")
         return user_similarity
     
     def build_content_based_model(self) -> Dict[str, Any]:
@@ -297,7 +294,7 @@ class RecommendationSystem:
                 return []
             
             # Get user's ratings
-            user_ratings = self.user_item_matrix[user_idx].toarray().flatten()
+            user_ratings = self.user_item_dense[user_idx].copy()
             unrated_items = np.where(user_ratings == 0)[0]
             
             if len(unrated_items) == 0:
@@ -422,7 +419,7 @@ class RecommendationSystem:
                 predicted_ratings = np.dot(item_factors, user_vector)
                 
                 # Get user's current ratings
-                current_ratings = self.user_item_matrix[user_idx].toarray().flatten()
+                current_ratings = self.user_item_dense[user_idx].copy()
                 
                 # Only recommend items user hasn't rated
                 unrated_items = np.where(current_ratings == 0)[0]
@@ -477,17 +474,30 @@ class RecommendationSystem:
             recall_scores = []
             ndcg_scores = []
             
+            rng = np.random.RandomState(self.config['random_state'])
+            
             for user_idx in test_users[:20]:  # Sample for faster evaluation
                 
-                # Get user's actual high-rated items (rating >= 4)
-                user_ratings = self.user_item_matrix[user_idx].toarray().flatten()
-                actual_liked_items = set(np.where(user_ratings >= 4)[0])
+                # Hold out ~30% of this user's ratings: they are hidden from the
+                # recommenders and the held-out items rated >= 4 are the ground
+                # truth. (Recommending only unrated items against the full
+                # rating history would make every hit impossible.)
+                full_ratings = self.user_item_dense[user_idx].copy()
+                rated_items = np.where(full_ratings > 0)[0]
+                if len(rated_items) < 2:
+                    continue
+                held_out = rng.choice(rated_items, size=max(1, int(0.3 * len(rated_items))), replace=False)
+                actual_liked_items = set(int(i) for i in held_out if full_ratings[i] >= 4)
                 
                 if len(actual_liked_items) == 0:
                     continue
                 
-                # Get recommendations
-                recommendations = recommend_function(user_idx, self.config['n_recommendations'])
+                # Get recommendations with the held-out ratings hidden
+                self.user_item_dense[user_idx, held_out] = 0
+                try:
+                    recommendations = recommend_function(user_idx, self.config['n_recommendations'])
+                finally:
+                    self.user_item_dense[user_idx] = full_ratings
                 recommended_items = set([item_idx for item_idx, _ in recommendations])
                 
                 if len(recommended_items) == 0:
@@ -580,7 +590,8 @@ class RecommendationSystem:
             recommendations_made=total_recommendations,
             recommendations_clicked=recommendations_clicked,
             recommendations_purchased=recommendations_purchased,
-            **self.config['business_params']
+            avg_order_value=self.config['business_params']['avg_order_value'],
+            recommendation_cost=self.config['business_params']['recommendation_cost']
         )
         
         # Add additional metrics

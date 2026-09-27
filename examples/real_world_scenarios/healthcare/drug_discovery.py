@@ -31,6 +31,16 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
@@ -39,9 +49,9 @@ from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class DrugDiscoverySystem:
     """Complete drug discovery and molecular analysis system."""
@@ -49,8 +59,8 @@ class DrugDiscoverySystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize drug discovery system."""
         
-        self.config = config or {
-            'n_compounds': 10000,
+        defaults = {
+            'n_compounds': 3000,
             'test_size': 0.2,
             'validation_size': 0.1,
             'random_state': 42,
@@ -62,6 +72,8 @@ class DrugDiscoverySystem:
             'success_threshold': 0.7,
             'safety_threshold': 0.8
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -271,20 +283,31 @@ class DrugDiscoverySystem:
         
         return df_features
     
+    @staticmethod
+    def _model_features(X: pd.DataFrame) -> pd.DataFrame:
+        """Return only the numeric descriptor columns used by the estimators.
+
+        Identifier columns such as ``compound_id`` are kept in the frame for
+        reporting but must never reach the models.
+        """
+        return X.drop(columns=['compound_id'], errors='ignore').select_dtypes(
+            include=[np.number, bool]
+        ).astype(float)
+
     def train_admet_models(self, X: pd.DataFrame, targets: Dict[str, pd.Series]) -> Dict[str, Any]:
         """Train ADMET (Absorption, Distribution, Metabolism, Excretion, Toxicity) models."""
         
         print("🧬 Training ADMET prediction models...")
         
-        # Split data
-        from sklearn.model_selection import train_test_split
+        # Split data (chronological split so the same rows are used downstream)
+        X_features = self._model_features(X)
         
         split_idx = int(len(X) * (1 - self.config['test_size'] - self.config['validation_size']))
         val_idx = int(len(X) * (1 - self.config['test_size']))
         
-        X_train = X.iloc[:split_idx]
-        X_val = X.iloc[split_idx:val_idx]
-        X_test = X.iloc[val_idx:]
+        X_train = X_features.iloc[:split_idx]
+        X_val = X_features.iloc[split_idx:val_idx]
+        X_test = X_features.iloc[val_idx:]
         
         print(f"   Training compounds: {len(X_train)}")
         print(f"   Validation compounds: {len(X_val)}")
@@ -293,15 +316,15 @@ class DrugDiscoverySystem:
         # Initialize models
         models = {
             'Random Forest': ClassificationModels().get_random_forest(
-                n_estimators=200, max_depth=12, min_samples_split=5,
+                n_estimators=50, max_depth=12, min_samples_split=5,
                 random_state=self.config['random_state']
             ),
             'Gradient Boosting': ClassificationModels().get_gradient_boosting(
-                n_estimators=200, learning_rate=0.1, max_depth=6,
+                n_estimators=50, learning_rate=0.1, max_depth=6,
                 random_state=self.config['random_state']
             ),
             'Neural Network': ClassificationModels().get_neural_network(
-                hidden_layer_sizes=(100, 50), max_iter=500,
+                hidden_layer_sizes=(64, 32), max_iter=200,
                 random_state=self.config['random_state']
             ),
             'SVM': ClassificationModels().get_svm(
@@ -312,16 +335,16 @@ class DrugDiscoverySystem:
         
         # Regression models for continuous targets
         reg_models = {
-            'Random Forest Reg': RegressionModels().get_random_forest(
-                n_estimators=200, max_depth=12,
+            'Random Forest Reg': RegressionModels().get_random_forest_regression(
+                n_estimators=50, max_depth=12,
                 random_state=self.config['random_state']
             ),
-            'Gradient Boosting Reg': RegressionModels().get_gradient_boosting(
-                n_estimators=200, learning_rate=0.1,
+            'Gradient Boosting Reg': RegressionModels().get_gradient_boosting_regression(
+                n_estimators=50, learning_rate=0.1,
                 random_state=self.config['random_state']
             ),
-            'Neural Network Reg': RegressionModels().get_neural_network(
-                hidden_layer_sizes=(100, 50), max_iter=500,
+            'Neural Network Reg': RegressionModels().get_neural_network_regression(
+                hidden_layer_sizes=(64, 32), max_iter=200,
                 random_state=self.config['random_state']
             )
         }
@@ -409,10 +432,19 @@ class DrugDiscoverySystem:
         # Get test data
         test_idx = int(len(X) * (1 - self.config['test_size']))
         X_test = X.iloc[test_idx:]
+        X_test_features = self._model_features(X_test)
+        
+        # Predict every ADMET property for the whole test set at once (one
+        # vectorised call per model instead of one call per compound).
+        batch_predictions: Dict[str, np.ndarray] = {}
+        for target_name, results in admet_results.items():
+            if 'best_model' in results:
+                model = results['results'][results['best_model']]['model']
+                batch_predictions[target_name] = np.asarray(model.predict(X_test_features))
         
         lead_candidates = []
         
-        for idx in X_test.index:
+        for row_pos, idx in enumerate(X_test.index):
             compound = X_test.loc[idx]
             compound_id = compound.get('compound_id', f'COMP_{idx}')
             
@@ -420,14 +452,8 @@ class DrugDiscoverySystem:
             admet_predictions = {}
             admet_scores = {}
             
-            for target_name, results in admet_results.items():
-                if 'best_model' in results:
-                    best_model_name = results['best_model']
-                    model = results['results'][best_model_name]['model']
-                    
-                    # Make prediction
-                    compound_features = compound.drop('compound_id', errors='ignore').values.reshape(1, -1)
-                    pred = model.predict(compound_features)[0]
+            for target_name, preds in batch_predictions.items():
+                    pred = preds[row_pos]
                     admet_predictions[target_name] = pred
                     
                     # Convert to score (0-1 scale, higher is better)
@@ -794,7 +820,11 @@ class DrugDiscoverySystem:
                 ax10.set_title('Top Lead Compounds', fontweight='bold', y=0.95)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "drug_discovery.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Visualizations completed")
     
@@ -878,7 +908,7 @@ def main():
     """Main execution function."""
     
     config = {
-        'n_compounds': 10000,
+        'n_compounds': 3000,
         'target_properties': ['toxicity', 'efficacy', 'bioavailability', 'solubility', 'stability'],
         'success_threshold': 0.7,
         'safety_threshold': 0.8

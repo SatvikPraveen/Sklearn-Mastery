@@ -30,13 +30,22 @@ from itertools import combinations
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
-from sklearn_mastery.data.generators import DataGenerator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator
 
 class MarketBasketAnalyzer:
     """Complete market basket analysis pipeline."""
@@ -44,7 +53,7 @@ class MarketBasketAnalyzer:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize market basket analyzer."""
         
-        self.config = config or {
+        defaults = {
             'n_transactions': 10000,
             'n_products': 200,
             'avg_items_per_transaction': 5,
@@ -59,6 +68,8 @@ class MarketBasketAnalyzer:
                 'inventory_cost_rate': 0.02
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -617,9 +628,12 @@ class MarketBasketAnalyzer:
             axes[1, 2].set_ylabel('Potential Revenue ($)')
         
         plt.tight_layout()
+        # Headless-friendly: save the figure instead of opening a window.
         if save_plots:
-            plt.savefig('market_basket_analysis_dashboard.png', dpi=300, bbox_inches='tight')
-        plt.show()
+            figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+            figure_dir.mkdir(parents=True, exist_ok=True)
+            plt.savefig(figure_dir / "market_basket_analysis.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Market basket visualizations created")
     

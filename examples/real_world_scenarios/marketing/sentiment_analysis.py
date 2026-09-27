@@ -27,20 +27,31 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, Any, List, Optional
 from datetime import datetime, timedelta
+import time
 import warnings
 warnings.filterwarnings('ignore')
 import re
 import string
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class SentimentAnalysisSystem:
     """Complete sentiment analysis system for marketing and customer insights."""
@@ -48,11 +59,16 @@ class SentimentAnalysisSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize sentiment analysis system."""
         
-        self.config = config or {
-            'n_texts': 50000,
+        defaults = {
+            'n_texts': 5000,
             'test_size': 0.2,
             'random_state': 42,
-            'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression', 'neural_network'],
+            'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression'],
+            'model_params': {
+                'random_forest': {'n_estimators': 50, 'max_depth': 12, 'class_weight': 'balanced'},
+                'gradient_boosting': {'n_estimators': 50, 'max_depth': 3},
+                'logistic_regression': {'max_iter': 500, 'class_weight': 'balanced'},
+            },
             'sentiment_classes': ['negative', 'neutral', 'positive'],
             'emotion_classes': ['anger', 'fear', 'joy', 'sadness', 'surprise', 'neutral'],
             'text_sources': ['reviews', 'social_media', 'surveys', 'support_tickets', 'forums'],
@@ -64,6 +80,8 @@ class SentimentAnalysisSystem:
                 'negative_sentiment_cost': 200
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -75,6 +93,19 @@ class SentimentAnalysisSystem:
         self.text_data = None
         self.sentiment_results = {}
         self.best_models = {}
+        self.model_feature_columns_ = None
+
+    def _encode_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """One-hot encode categorical metadata (source, user type, ...) for modelling.
+
+        The column layout learned on the first call is reused afterwards so that
+        train and test frames always line up.
+        """
+        categorical = X.select_dtypes(exclude=[np.number, 'bool']).columns.tolist()
+        X_enc = pd.get_dummies(X, columns=categorical, dtype=float)
+        if self.model_feature_columns_ is None:
+            self.model_feature_columns_ = X_enc.columns.tolist()
+        return X_enc.reindex(columns=self.model_feature_columns_, fill_value=0.0)
         
     def generate_text_dataset(self) -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
         """Generate comprehensive text dataset with sentiment and emotion labels."""
@@ -162,9 +193,14 @@ class SentimentAnalysisSystem:
         
         # Add temporal aggregations
         df = df.sort_values('date')
-        df['sentiment_trend_7d'] = df.groupby('source')['sentiment'].rolling(7, min_periods=1).apply(
-            lambda x: (x == 'positive').mean() - (x == 'negative').mean()
-        ).reset_index(0, drop=True)
+        # Rolling windows only aggregate numeric data, so encode the label first
+        # (+1 positive, -1 negative, 0 neutral); the rolling mean is then the trend.
+        sentiment_sign = df['sentiment'].map({'positive': 1.0, 'negative': -1.0}).fillna(0.0)
+        df['sentiment_trend_7d'] = (
+            sentiment_sign.groupby(df['source'])
+            .rolling(7, min_periods=1).mean()
+            .reset_index(0, drop=True)
+        )
         
         # Create targets
         targets = {
@@ -505,32 +541,35 @@ class SentimentAnalysisSystem:
         for target_name, target in targets.items():
             print(f"\nTraining models for {target_name}...")
             
-            # Split data
+            # Split data (stratified; categoricals one-hot encoded for the models)
+            X_encoded = self._encode_features(X)
             X_train, X_test, y_train, y_test = self.data_loader.train_test_split(
-                X, target, test_size=self.config['test_size']
+                X_encoded, target, test_size=self.config['test_size']
             )
             
             # Initialize models
             models = ClassificationModels()
+            evaluator = MetricsCalculator(task_type='classification')
             target_results = {}
             
             for algorithm in self.config['algorithms']:
                 print(f"  Training {algorithm}...")
                 
-                # Train model
-                model, training_time = models.train_model(
-                    X_train, y_train, 
-                    algorithm=algorithm,
-                    class_weight='balanced'
-                )
+                # Build and train the model (class_weight='balanced' where supported)
+                params = dict(self.config['model_params'].get(algorithm, {}))
+                params.setdefault('random_state', self.config['random_state'])
+                model = models.get_model(algorithm, **params)
+                start_time = time.perf_counter()
+                model.fit(X_train, y_train)
+                training_time = time.perf_counter() - start_time
                 
                 # Make predictions
                 y_pred = model.predict(X_test)
                 y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
                 
-                # Evaluate model
-                evaluator = ModelEvaluator()
-                metrics = evaluator.classification_metrics(y_test, y_pred, y_pred_proba)
+                # Evaluate model (weighted precision/recall/F1 for the multi-class targets)
+                metrics = evaluator.calculate_all_metrics(y_test, y_pred, y_proba=y_pred_proba)
+                metrics['f1_score'] = metrics['f1']
                 
                 # Calculate business impact
                 business_metrics = self.calculate_sentiment_impact(
@@ -637,23 +676,28 @@ class SentimentAnalysisSystem:
         sentiment_model = models_dict['sentiment_classification']['best_performance']['model']
         emotion_model = models_dict['emotion_classification']['best_performance']['model']
         
-        # Sample recent data for monitoring
+        # Sample recent data for monitoring and score it in one batch
         monitoring_data = []
         sample_size = min(1000, len(X))
         X_sample = X.sample(n=sample_size, random_state=self.config['random_state'])
+        X_encoded = self._encode_features(X_sample)
         
-        for idx, row in X_sample.iterrows():
-            # Predict sentiment and emotion
-            sentiment_pred = sentiment_model.predict([row])[0]
-            emotion_pred = emotion_model.predict([row])[0]
-            
-            # Get prediction probabilities if available
-            sentiment_proba = sentiment_model.predict_proba([row])[0] if hasattr(sentiment_model, 'predict_proba') else None
-            emotion_proba = emotion_model.predict_proba([row])[0] if hasattr(emotion_model, 'predict_proba') else None
+        sentiment_preds = sentiment_model.predict(X_encoded)
+        emotion_preds = emotion_model.predict(X_encoded)
+        
+        # Get prediction probabilities if available
+        sentiment_probas = (sentiment_model.predict_proba(X_encoded)
+                            if hasattr(sentiment_model, 'predict_proba') else None)
+        emotion_probas = (emotion_model.predict_proba(X_encoded)
+                          if hasattr(emotion_model, 'predict_proba') else None)
+        
+        for i, (idx, row) in enumerate(X_sample.iterrows()):
+            sentiment_pred = sentiment_preds[i]
+            emotion_pred = emotion_preds[i]
             
             # Calculate confidence scores
-            sentiment_confidence = max(sentiment_proba) if sentiment_proba is not None else 0.5
-            emotion_confidence = max(emotion_proba) if emotion_proba is not None else 0.5
+            sentiment_confidence = float(sentiment_probas[i].max()) if sentiment_probas is not None else 0.5
+            emotion_confidence = float(emotion_probas[i].max()) if emotion_probas is not None else 0.5
             
             # Determine alert level
             alert_level = 'low'
@@ -946,7 +990,11 @@ Recommendations:
         ax15.set_title('Sentiment Analysis Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "sentiment_analysis.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Sentiment analysis visualizations completed")
     

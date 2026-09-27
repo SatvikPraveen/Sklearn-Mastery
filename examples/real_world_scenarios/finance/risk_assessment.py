@@ -30,16 +30,113 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.supervised.regression import RegressionModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+
+
+# ---------------------------------------------------------------------------
+# Small adapters between this narrative example and the sklearn_mastery API.
+# ---------------------------------------------------------------------------
+def _build_model(models: Any, algorithm: str, **kwargs: Any) -> Any:
+    """Instantiate a model wrapper, dropping kwargs the algorithm does not accept.
+
+    ``class_weight`` for example is meaningful for random forests and logistic
+    regression but not for gradient boosting or neural networks.
+    """
+    import inspect
+
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    wrapper_cls = type(models.get_model(algorithm))
+    accepted = inspect.signature(wrapper_cls.__init__).parameters
+    filtered = {k: v for k, v in kwargs.items() if k in accepted and v is not None}
+    model = models.get_model(algorithm, **filtered)
+    if algorithm in ('neural_network', 'logistic_regression', 'ridge', 'linear_regression'):
+        # Scale-sensitive learners get a standardiser in front of them.
+        model = make_pipeline(StandardScaler(), model)
+    if algorithm == 'neural_network' and isinstance(models, RegressionModels):
+        # Regression targets here are tiny (returns, PDs); standardise them for the MLP.
+        from sklearn.compose import TransformedTargetRegressor
+
+        model = TransformedTargetRegressor(regressor=model, transformer=StandardScaler())
+    return model
+
+
+def _train_model(models: Any, X: Any, y: Any, algorithm: str, **kwargs: Any) -> Tuple[Any, float]:
+    """Build and fit a wrapper; returns ``(fitted_model, training_seconds)``."""
+    import time
+
+    model = _build_model(models, algorithm, **kwargs)
+    start = time.perf_counter()
+    model.fit(X, y)
+    return model, time.perf_counter() - start
+
+
+def _classification_metrics(y_true: Any, y_pred: Any, y_proba: Any = None) -> Dict[str, float]:
+    """Classification metrics via MetricsCalculator (adds an ``f1_score`` alias)."""
+    metrics = MetricsCalculator(task_type='classification').calculate_all_metrics(
+        y_true, y_pred, y_proba=y_proba
+    )
+    metrics['f1_score'] = metrics['f1']
+    return metrics
+
+
+def _regression_metrics(y_true: Any, y_pred: Any) -> Dict[str, float]:
+    """Regression metrics via MetricsCalculator (adds an ``r2_score`` alias)."""
+    metrics = MetricsCalculator(task_type='regression').calculate_all_metrics(y_true, y_pred)
+    metrics['r2_score'] = metrics['r2']
+    return metrics
+
+
+def _encode_features(X: pd.DataFrame, columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """One-hot encode non-numeric columns so tree/linear models can consume them.
+
+    When ``columns`` is given the result is aligned to that column list (missing
+    dummies are filled with 0), so new data matches the training layout.
+    """
+    encoded = pd.get_dummies(X, dtype=float)
+    if columns is not None:
+        encoded = encoded.reindex(columns=columns, fill_value=0.0)
+    return encoded
+
+
+def _agg_to_nested_dict(agg: pd.DataFrame) -> Dict[str, Dict[str, Dict[Any, float]]]:
+    """Convert a multi-statistic groupby result into ``{column: {stat: {group: value}}}``."""
+    nested: Dict[str, Dict[str, Dict[Any, float]]] = {}
+    for col in agg.columns:
+        if isinstance(col, tuple):
+            nested.setdefault(col[0], {})[col[1]] = agg[col].to_dict()
+        else:
+            nested[col] = {'value': agg[col].to_dict()}
+    return nested
+
+
+def _regression_algorithm(models: Any, algorithm: str) -> str:
+    """Map classifier-only names onto their regression analogue (logistic -> ridge)."""
+    if isinstance(models, RegressionModels) and algorithm == 'logistic_regression':
+        return 'ridge'
+    return algorithm
+
+
 
 class RiskAssessmentSystem:
     """Complete financial risk assessment and management system."""
@@ -47,10 +144,10 @@ class RiskAssessmentSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize risk assessment system."""
         
-        self.config = config or {
-            'n_entities': 10000,  # Borrowers/counterparties
+        defaults = {
+            'n_entities': 4000,  # Borrowers/counterparties
             'n_portfolios': 50,
-            'n_scenarios': 1000,
+            'n_scenarios': 300,
             'test_size': 0.2,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression', 'neural_network'],
@@ -65,6 +162,8 @@ class RiskAssessmentSystem:
                 'unexpected_loss_multiplier': 2.33  # 99% confidence
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -553,8 +652,11 @@ class RiskAssessmentSystem:
             print(f"\nTraining models for {target_name}...")
             
             # Remove invalid targets
-            valid_mask = target.notna() & (target >= 0)
-            X_clean = X[valid_mask]
+            valid_mask = target.notna()
+            if pd.api.types.is_numeric_dtype(target):
+                valid_mask &= target >= 0
+            X_clean = _encode_features(X[valid_mask])
+            self.model_feature_columns_ = list(X_clean.columns)
             target_clean = target[valid_mask]
             
             if len(X_clean) == 0:
@@ -579,9 +681,9 @@ class RiskAssessmentSystem:
                 
                 try:
                     # Train model
-                    model, training_time = models.train_model(
+                    model, training_time = _train_model(models, 
                         X_train, y_train, 
-                        algorithm=algorithm,
+                        algorithm=_regression_algorithm(models, algorithm),
                         class_weight='balanced' if target_name == 'credit_rating' else None
                     )
                     
@@ -593,11 +695,10 @@ class RiskAssessmentSystem:
                         y_pred_proba = model.predict_proba(X_test)
                     
                     # Evaluate model
-                    evaluator = ModelEvaluator()
                     if target_name == 'credit_rating':
-                        metrics = evaluator.classification_metrics(y_test, y_pred, y_pred_proba)
+                        metrics = _classification_metrics(y_test, y_pred, y_pred_proba)
                     else:
-                        metrics = evaluator.regression_metrics(y_test, y_pred)
+                        metrics = _regression_metrics(y_test, y_pred)
                     
                     # Calculate business impact
                     business_metrics = self.calculate_risk_impact(
@@ -689,6 +790,7 @@ class RiskAssessmentSystem:
             # Rating migration analysis (simplified)
             rating_order = {'AAA': 7, 'AA': 6, 'A': 5, 'BBB': 4, 'BB': 3, 'B': 2, 'CCC': 1, 'D': 0}
             true_numeric = y_true.map(rating_order).fillna(0)
+            y_pred = pd.Series(np.asarray(y_pred), index=y_true.index)
             pred_numeric = y_pred.map(rating_order).fillna(0)
             
             # Migration accuracy (within 1 notch)
@@ -797,8 +899,9 @@ class RiskAssessmentSystem:
                     X_stressed[var] = X_stressed[var] + shock
             
             # Predict stressed PDs
-            stressed_pd = pd_model.predict(X_stressed)
-            baseline_pd = pd_model.predict(X_sample) if scenario_name != 'baseline' else stressed_pd
+            stressed_pd = pd_model.predict(_encode_features(X_stressed, self.model_feature_columns_))
+            baseline_pd = (pd_model.predict(_encode_features(X_sample, self.model_feature_columns_))
+                           if scenario_name != 'baseline' else stressed_pd)
             
             # Calculate portfolio impact
             total_exposure = X_sample['total_assets'].sum()
@@ -1081,7 +1184,11 @@ Business Impact:
         ax15.set_title('Risk Assessment Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "risk_assessment.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Risk assessment visualizations completed")
     

@@ -29,6 +29,16 @@ from typing import Dict, Tuple, Any, List
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
@@ -36,9 +46,9 @@ from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class CreditScoringSystem:
     """Complete credit scoring system pipeline."""
@@ -46,7 +56,7 @@ class CreditScoringSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize credit scoring system."""
         
-        self.config = config or {
+        defaults = {
             'n_applicants': 10000,
             'test_size': 0.2,
             'validation_size': 0.1,
@@ -62,6 +72,8 @@ class CreditScoringSystem:
                 'processing_cost': 100
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -135,8 +147,10 @@ class CreditScoringSystem:
                 0.05 * (home_ownership == 'Rent')
             )
             
-            # Add noise and convert to probability
-            risk_score += np.random.normal(0, 0.1)
+            # Shift the intercept so the base default rate matches the configured
+            # historical rate, add noise and convert to a probability
+            base_rate = self.config['default_rate']
+            risk_score += np.log(base_rate / (1 - base_rate)) + np.random.normal(0, 0.1)
             default_probability = 1 / (1 + np.exp(-risk_score))  # Sigmoid
             
             # Generate default label
@@ -264,8 +278,13 @@ class CreditScoringSystem:
             from imblearn.pipeline import Pipeline as ImbPipeline
             
             # Combined approach: SMOTE + undersampling
-            smote = SMOTE(random_state=self.config['random_state'], k_neighbors=3)
-            undersampler = RandomUnderSampler(random_state=self.config['random_state'], sampling_strategy=0.3)
+            # Oversample the minority class up to a 0.3 minority:majority ratio,
+            # then trim the majority class so the final ratio is 0.5.
+            minority_ratio = y.mean() / (1 - y.mean())
+            smote_ratio = max(0.3, minority_ratio)
+            smote = SMOTE(random_state=self.config['random_state'], k_neighbors=3, sampling_strategy=smote_ratio)
+            undersampler = RandomUnderSampler(random_state=self.config['random_state'],
+                                              sampling_strategy=max(0.5, smote_ratio))
             
             pipeline = ImbPipeline([
                 ('smote', smote),

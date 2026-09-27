@@ -145,8 +145,8 @@ class DataLoader:
         df['sales_lag7'] = sales_series.shift(7)
         
         # Fill initial NaN values
-        df['sales_lag1'].fillna(method='bfill', inplace=True)
-        df['sales_lag7'].fillna(method='bfill', inplace=True)
+        df['sales_lag1'] = df['sales_lag1'].bfill()
+        df['sales_lag7'] = df['sales_lag7'].bfill()
         
         return df, pd.Series(sales, name='sales')
     
@@ -302,6 +302,23 @@ class DataLoader:
         else:
             return df
     
+    def train_test_split(self, X, y, test_size: float = 0.2,
+                         stratify: Optional[bool] = None):
+        """Train/test split that stratifies automatically for classification targets.
+
+        ``stratify=None`` (the default) stratifies when ``y`` looks categorical
+        (few distinct values, every class present at least twice); continuous
+        regression targets are split without stratification.
+        """
+        y_series = pd.Series(np.asarray(y)) if not isinstance(y, pd.Series) else y
+        if stratify is None:
+            counts = y_series.value_counts()
+            stratify = (len(counts) <= 20 and len(counts) < len(y_series) and counts.min() >= 2)
+        stratify_param = y if stratify else None
+        return train_test_split(X, y, test_size=test_size,
+                                stratify=stratify_param,
+                                random_state=self.random_state)
+
     def create_train_test_split(self, X: pd.DataFrame, y: pd.Series, 
                                test_size: float = 0.2, 
                                stratify: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:

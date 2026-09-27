@@ -29,16 +29,26 @@ from typing import Dict, Tuple, Any, List
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
-from sklearn_mastery.evaluation.metrics import ClusteringEvaluator
+from sklearn_mastery.models.unsupervised.clustering import evaluate_clustering
 from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator
 
 class CustomerSegmentationAnalyzer:
     """Complete customer segmentation analysis pipeline."""
@@ -46,7 +56,7 @@ class CustomerSegmentationAnalyzer:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize customer segmentation analyzer."""
         
-        self.config = config or {
+        defaults = {
             'data_size': 5000,
             'random_state': 42,
             'clustering_algorithms': ['kmeans', 'hierarchical', 'gaussian_mixture'],
@@ -58,6 +68,8 @@ class CustomerSegmentationAnalyzer:
                 'campaign_cost_per_customer': 15
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -180,7 +192,6 @@ class CustomerSegmentationAnalyzer:
         
         # Initialize clustering models
         clustering_models = ClusteringModels()
-        evaluator = ClusteringEvaluator()
         
         # Test different algorithms and segment counts
         clustering_results = {}
@@ -206,7 +217,7 @@ class CustomerSegmentationAnalyzer:
                     labels = model.fit_predict(X_scaled)
                     
                     # Evaluate clustering quality
-                    metrics = evaluator.evaluate_clustering(X_scaled, labels)
+                    metrics = evaluate_clustering(X_scaled, labels)
                     
                     # Calculate business relevance score
                     segment_sizes = pd.Series(labels).value_counts()
@@ -581,9 +592,11 @@ class CustomerSegmentationAnalyzer:
                            f'${value:,.0f}', ha='center', va='bottom')
         
         plt.tight_layout()
-        if save_plots:
-            plt.savefig('customer_segmentation_dashboard.png', dpi=300, bbox_inches='tight')
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "customer_segmentation.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Segmentation visualizations created")
     

@@ -28,19 +28,26 @@ from typing import Dict, Tuple, Any
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
-from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.data.preprocessors import DataPreprocessor
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
-from sklearn_mastery.pipelines.model_selection import ModelSelector
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class CustomerChurnPredictor:
     """Complete customer churn prediction pipeline."""
@@ -48,20 +55,22 @@ class CustomerChurnPredictor:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize churn prediction system."""
         
-        self.config = config or {
-            'data_size': 10000,
+        defaults = {
+            'data_size': 4000,
             'test_size': 0.2,
             'validation_size': 0.1,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'xgboost'],
             'hyperparameter_tuning': True,
-            'cross_validation_folds': 5,
+            'cross_validation_folds': 3,
             'business_params': {
                 'avg_customer_value': 1200,
                 'retention_cost': 50,
                 'campaign_cost_per_customer': 25
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -154,21 +163,21 @@ class CustomerChurnPredictor:
             stratify=y
         )
         
-        # Initialize models
+        # Initialize model factories from the framework
         models = ClassificationModels()
-        ensemble = EnsembleMethods()
-        model_selector = ModelSelector(task_type='classification', random_state=self.config['random_state'])
+        ensemble = EnsembleMethods(random_state=self.config['random_state'])
+        rs = self.config['random_state']
         
-        # Define models to test
+        # Define models to test (sizes kept small so the example runs in seconds)
         algorithms_to_test = {
-            'Logistic Regression': models.get_logistic_regression(random_state=self.config['random_state']),
-            'Random Forest': models.get_random_forest(n_estimators=100, random_state=self.config['random_state']),
-            'Gradient Boosting': models.get_gradient_boosting(n_estimators=100, random_state=self.config['random_state']),
-            'XGBoost': models.get_xgboost(n_estimators=100, random_state=self.config['random_state']) if hasattr(models, 'get_xgboost') else None,
+            'Logistic Regression': models.get_logistic_regression(max_iter=2000, random_state=rs),
+            'Random Forest': models.get_random_forest(n_estimators=50, random_state=rs),
+            'Gradient Boosting': models.get_gradient_boosting(n_estimators=50, random_state=rs),
+            'XGBoost': models.get_xgboost(n_estimators=50, random_state=rs) if 'xgboost' in ClassificationModels.available_models() else None,
             'Voting Ensemble': ensemble.get_voting_classifier([
-                ('rf', models.get_random_forest(n_estimators=50, random_state=self.config['random_state'])),
-                ('gb', models.get_gradient_boosting(n_estimators=50, random_state=self.config['random_state'])),
-                ('lr', models.get_logistic_regression(random_state=self.config['random_state']))
+                ('rf', models.get_random_forest(n_estimators=30, random_state=rs)),
+                ('gb', models.get_gradient_boosting(n_estimators=30, random_state=rs)),
+                ('lr', models.get_logistic_regression(max_iter=2000, random_state=rs))
             ], voting='soft')
         }
         
@@ -222,6 +231,8 @@ class CustomerChurnPredictor:
         # Store results
         self.results['models'] = model_results
         self.results['best_model_name'] = best_model_name
+        self.results['X_train'] = X_train
+        self.results['y_train'] = y_train
         self.results['X_test'] = X_test
         self.results['y_test'] = y_test
         
@@ -239,25 +250,23 @@ class CustomerChurnPredictor:
         from sklearn.model_selection import GridSearchCV
         from sklearn.metrics import make_scorer
         
-        # Define parameter grids for different models
+        # Define (deliberately tiny) parameter grids for different models.
+        # In production you would search a much wider space.
         param_grids = {
             'Random Forest': {
-                'n_estimators': [100, 200, 300],
-                'max_depth': [10, 15, 20, None],
-                'min_samples_split': [2, 5, 10],
-                'min_samples_leaf': [1, 2, 4]
+                'n_estimators': [50, 100],
+                'max_depth': [10, None],
+                'min_samples_leaf': [1, 4]
             },
             'Gradient Boosting': {
-                'n_estimators': [100, 200],
-                'learning_rate': [0.05, 0.1, 0.2],
-                'max_depth': [3, 5, 7],
-                'subsample': [0.8, 0.9, 1.0]
+                'n_estimators': [50, 100],
+                'learning_rate': [0.05, 0.1],
+                'max_depth': [3, 5]
             },
             'XGBoost': {
-                'n_estimators': [100, 200],
-                'learning_rate': [0.05, 0.1, 0.2],
-                'max_depth': [3, 5, 7],
-                'subsample': [0.8, 1.0]
+                'n_estimators': [50, 100],
+                'learning_rate': [0.05, 0.1],
+                'max_depth': [3, 5]
             }
         }
         
@@ -280,18 +289,14 @@ class CustomerChurnPredictor:
                 param_grids[self.best_model_name],
                 cv=3,  # Reduced for speed
                 scoring=business_scorer,
-                n_jobs=-1,
-                verbose=1
+                n_jobs=1,
+                verbose=0
             )
             
-            X_train = self.results['models'][self.best_model_name]['model'].fit(
-                self.X_raw.iloc[:-len(self.results['X_test'])], 
-                self.y_raw.iloc[:-len(self.results['y_test'])]
-            )
-            
-            # Note: In a real implementation, you'd use the actual training set
-            print("   Performing grid search (this may take a while)...")
-            grid_search.fit(self.X_raw.iloc[:-1000], self.y_raw.iloc[:-1000])  # Simplified for demo
+            # Search on the same engineered training split used above so the
+            # tuned model is directly comparable with the baseline models.
+            print("   Performing grid search...")
+            grid_search.fit(self.results['X_train'], self.results['y_train'])
             
             self.best_model = grid_search.best_estimator_
             
@@ -395,12 +400,14 @@ class CustomerChurnPredictor:
         }
         
         # Create dashboard
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
         fig = self.visualizer.plot_churn_analysis_dashboard(
             viz_data, 
-            save_path='churn_analysis_dashboard.png' if save_plots else None
+            save_path=str(figure_dir / "customer_churn_prediction.png") if save_plots else None
         )
-        
-        plt.show()
+        plt.close("all")
         
         print("✅ Visualizations created")
     
@@ -455,7 +462,7 @@ def main():
     
     # Configuration
     config = {
-        'data_size': 10000,
+        'data_size': 4000,
         'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression'],
         'hyperparameter_tuning': True,
         'business_params': {

@@ -1,280 +1,114 @@
-# File: examples/real_world_scenarios/README.md
-
-# Location: examples/real_world_scenarios/README.md
-
 # Real-World ML Scenarios
 
-Production-ready machine learning examples across industries, demonstrating complete end-to-end workflows using the ML Pipeline Framework.
+End-to-end, self-contained example scripts that apply `sklearn_mastery` to
+realistic business problems across six domains. Every script generates its own
+synthetic data (nothing is downloaded), runs headlessly, prints a narrative
+walk-through of the workflow and saves its figures under
+`results/figures/examples/<script>.png`.
 
-## 🎯 Quick Start
+## Running a scenario
 
-```python
-# Run a complete scenario
-python examples/real_world_scenarios/business_analytics/customer_churn_prediction.py
-
-# Or import and use components
-from examples.real_world_scenarios.business_analytics import customer_churn_prediction
-results = customer_churn_prediction.run_complete_analysis()
-```
-
-## 📋 Scenario Categories
-
-### 💼 Business Analytics
-
-- **Customer Churn Prediction** - Predict customer retention (⭐ Most Popular)
-- **Sales Forecasting** - Time series revenue prediction
-- **Market Basket Analysis** - Product recommendation patterns
-- **Fraud Detection** - Real-time transaction monitoring
-
-### 🏥 Healthcare
-
-- **Medical Diagnosis** - Disease classification from symptoms
-- **Drug Discovery** - Molecular property prediction
-- **Patient Outcome Prediction** - Treatment effectiveness
-
-### 💰 Finance
-
-- **Credit Scoring** - Loan default risk assessment
-- **Algorithmic Trading** - Automated trading strategies
-- **Risk Assessment** - Portfolio risk modeling
-- **Portfolio Optimization** - Asset allocation strategies
-
-### 🔧 Technology
-
-- **Recommendation Systems** - Collaborative filtering
-- **Anomaly Detection** - System monitoring and alerts
-- **Predictive Maintenance** - Equipment failure prediction
-- **Natural Language Processing** - Text analysis and classification
-
-### 🏭 Manufacturing
-
-- **Quality Control** - Defect detection and classification
-- **Supply Chain Optimization** - Inventory and logistics
-- **Demand Forecasting** - Production planning
-
-### 📈 Marketing
-
-- **Customer Segmentation** - Market targeting strategies
-- **Campaign Optimization** - A/B testing and ROI analysis
-- **Sentiment Analysis** - Social media and review analysis
-
-## 🎓 Difficulty Levels
-
-| Level            | Scenarios                                | Skills Required                       |
-| ---------------- | ---------------------------------------- | ------------------------------------- |
-| **Beginner**     | Customer Segmentation, Sales Forecasting | Basic ML, pandas, sklearn             |
-| **Intermediate** | Churn Prediction, Fraud Detection        | Feature engineering, model tuning     |
-| **Advanced**     | Algorithmic Trading, Drug Discovery      | Domain expertise, advanced techniques |
-
-## 🚀 Each Scenario Includes
-
-✅ **Business Context** - Real problem definition and impact  
-✅ **Complete Data Pipeline** - From raw data to predictions  
-✅ **Multiple Algorithms** - Comparison of different approaches  
-✅ **Feature Engineering** - Domain-specific feature creation  
-✅ **Model Evaluation** - Business-relevant metrics  
-✅ **Production Deployment** - Scalability and monitoring  
-✅ **ROI Analysis** - Business value quantification  
-✅ **Visualizations** - Executive-ready charts and reports
-
-## 📊 Business Impact Examples
-
-| Scenario         | Industry      | Typical ROI | Key Metric              |
-| ---------------- | ------------- | ----------- | ----------------------- |
-| Churn Prediction | Telecom       | 300-500%    | $1M+ annual savings     |
-| Fraud Detection  | Banking       | 1000%+      | 90%+ fraud caught       |
-| Recommendation   | E-commerce    | 200-400%    | 20%+ revenue increase   |
-| Maintenance      | Manufacturing | 400-600%    | 25%+ downtime reduction |
-
-## 🏃‍♂️ Running Scenarios
-
-### Individual Scenario
-
-```python
-# Navigate to specific scenario
-cd examples/real_world_scenarios/business_analytics/
-python customer_churn_prediction.py
-
-# With custom parameters
-python customer_churn_prediction.py --data-size large --algorithms rf,gb,xgb
-```
-
-### Batch Analysis
-
-```python
-# Run multiple scenarios for comparison
-python run_scenario_comparison.py \
-  --scenarios churn,fraud,segmentation \
-  --output-dir results/
-```
-
-### Jupyter Notebook
+Run from the repository root with the project virtual environment:
 
 ```bash
-# Interactive exploration
-jupyter notebook scenario_explorer.ipynb
+# any single scenario (works from any directory; the script adds the repo root to sys.path)
+MPLBACKEND=Agg .venv/bin/python examples/real_world_scenarios/business_analytics/customer_churn_prediction.py
+
+# equivalently, as a module
+MPLBACKEND=Agg .venv/bin/python -m examples.real_world_scenarios.business_analytics.customer_churn_prediction
 ```
 
-## 🛠️ Customization
+`MPLBACKEND=Agg` is only needed on machines without a display; the scripts never
+call `plt.show()`, so they also run fine over SSH or on CI.
 
-### Use Your Own Data
-
-```python
-# Replace synthetic data with your dataset
-from examples.real_world_scenarios.utilities import DataLoader
-
-# Load your data
-loader = DataLoader()
-X, y = loader.load_custom_data('path/to/your/data.csv')
-
-# Run any scenario with your data
-from examples.real_world_scenarios.business_analytics import CustomerChurnPredictor
-predictor = CustomerChurnPredictor()
-results = predictor.run_analysis(X, y)
-```
-
-### Modify Parameters
-
-```python
-# Customize any scenario
-config = {
-    'algorithms': ['random_forest', 'gradient_boosting', 'xgboost'],
-    'cross_validation': 10,
-    'test_size': 0.2,
-    'feature_selection': True,
-    'hyperparameter_tuning': True
-}
-
-results = predictor.run_analysis(X, y, config=config)
-```
-
-## 📈 Performance Benchmarks
-
-Tested on standard hardware (16GB RAM, 8 CPU cores):
-
-| Scenario              | Dataset Size     | Training Time | Accuracy | Memory Usage |
-| --------------------- | ---------------- | ------------- | -------- | ------------ |
-| Churn Prediction      | 100K samples     | 45s           | 89.2%    | 2.1GB        |
-| Fraud Detection       | 1M samples       | 120s          | 99.1%    | 4.8GB        |
-| Customer Segmentation | 500K samples     | 30s           | 85.7%    | 1.9GB        |
-| Recommendation        | 10M interactions | 300s          | 92.4%    | 8.2GB        |
-
-## 🔧 Technical Requirements
-
-**Minimum System Requirements:**
-
-- Python 3.8+
-- 8GB RAM
-- 4 CPU cores
-- 10GB disk space
-
-**Recommended for Large Datasets:**
-
-- Python 3.9+
-- 32GB RAM
-- 16 CPU cores
-- SSD storage
-- GPU (optional, for deep learning scenarios)
-
-**Dependencies:**
+To run all of them as a test suite (each script in its own subprocess, 300 s
+timeout, exit code must be 0):
 
 ```bash
-pip install -r requirements.txt
-# Core: scikit-learn, pandas, numpy, matplotlib
-# Extended: xgboost, optuna, shap, plotly
+.venv/bin/python -m pytest tests/test_examples.py -m slow -q
 ```
 
-## 📝 Documentation Structure
+## Runtime expectation
 
-Each scenario follows this structure:
+Every script is sized to finish in well under two minutes on a laptop (most in
+3-30 s); the whole suite takes about 4-5 minutes serially. Sizes are
+deliberately small (a few thousand samples, small forests, 3-fold CV, tiny
+grids) so the examples stay educational rather than exhaustive. Increase the
+`data_size` / `n_estimators` / `cross_validation_folds` entries in each script's
+`config` dictionary to scale them up.
 
-```
-scenario_name.py
-├── Business Problem Definition
-├── Dataset Description & Loading
-├── Exploratory Data Analysis
-├── Feature Engineering
-├── Model Training & Comparison
-├── Hyperparameter Tuning
-├── Model Evaluation & Interpretation
-├── Business Impact Analysis
-├── Production Deployment Guide
-└── Monitoring & Maintenance
-```
+## Scenarios
 
-## 🤝 Contributing New Scenarios
+| Domain | Script | Problem | Task type |
+| --- | --- | --- | --- |
+| business_analytics | `customer_churn_prediction.py` | Predict which subscribers will churn, with retention ROI | Binary classification |
+| business_analytics | `fraud_detection.py` | Flag fraudulent card transactions on imbalanced data | Binary classification / anomaly detection |
+| business_analytics | `market_basket_analysis.py` | Product affinity, association rules and cross-sell | Association rules / clustering |
+| business_analytics | `sales_forecasting.py` | Forecast daily revenue from calendar and lag features | Regression / time series |
+| finance | `algorithmic_trading.py` | Direction and return prediction for a trading strategy | Classification + regression |
+| finance | `credit_scoring.py` | Loan default risk with imbalanced-learn resampling | Binary classification |
+| finance | `portfolio_optimization.py` | Asset return prediction and allocation | Regression |
+| finance | `risk_assessment.py` | Credit rating, probability of default, expected loss | Classification + regression |
+| healthcare | `drug_discovery.py` | Molecular activity and property prediction | Classification + regression |
+| healthcare | `medical_diagnosis.py` | Multi-class disease diagnosis from symptoms and labs | Multi-class classification |
+| healthcare | `patient_outcome_prediction.py` | Readmission, mortality and length-of-stay | Classification + regression |
+| manufacturing | `demand_forecasting.py` | Product demand forecasting for production planning | Regression / time series |
+| manufacturing | `quality_control.py` | Defect detection from process sensors | Binary classification |
+| manufacturing | `supply_chain_optimization.py` | Service level and inventory optimisation | Regression |
+| marketing | `campaign_optimization.py` | Campaign response, ROI and spend allocation | Regression |
+| marketing | `customer_segmentation.py` | Behavioural segmentation with KMeans / GMM / hierarchical | Clustering |
+| marketing | `sentiment_analysis.py` | Review sentiment from bag-of-words features | Text classification |
+| technology | `anomaly_detection.py` | System-monitoring anomalies and alerting | Unsupervised anomaly detection |
+| technology | `natural_language_processing.py` | Text classification pipelines on synthetic corpora | Text classification |
+| technology | `predictive_maintenance.py` | Equipment failure prediction from sensor telemetry | Classification + clustering |
+| technology | `recommendation_systems.py` | Collaborative filtering and ranking metrics | Recommendation |
 
-1. **Choose Industry/Problem**: Select relevant business problem
-2. **Follow Template**: Use existing scenarios as templates
-3. **Include Business Context**: Explain real-world impact
-4. **Comprehensive Testing**: Ensure reproducible results
-5. **Documentation**: Complete docstrings and comments
-6. **Submit PR**: Include example outputs and benchmarks
+## What every scenario contains
 
-**Scenario Template:**
+1. Business problem definition and configuration (`config` dictionary; any key
+   you pass overrides the default).
+2. Synthetic data generation via `examples/real_world_scenarios/utilities/data_loaders.py`
+   or an in-script generator.
+3. Domain-specific feature engineering.
+4. Model training and comparison using the `sklearn_mastery` model factories
+   (`ClassificationModels`, `RegressionModels`, `ClusteringModels`,
+   `EnsembleMethods`) and, where useful, plain scikit-learn.
+5. Evaluation with `sklearn_mastery.evaluation.metrics` and the business
+   helpers in `utilities/evaluation_helpers.py`.
+6. Business impact / ROI analysis and a saved dashboard figure
+   (`utilities/visualization_helpers.py`).
+
+## Using the pieces from your own code
 
 ```python
-"""
-[Scenario Name] - Real-World ML Pipeline Example
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.business_analytics.customer_churn_prediction import CustomerChurnPredictor
 
-Business Problem: [Clear problem statement]
-Dataset: [Data description and source]
-Target: [Prediction target and type]
-Business Impact: [ROI and value proposition]
-Techniques: [ML methods used]
-"""
+loader = DataLoader(random_state=0)
+X, y = loader.load_customer_churn_data(n_samples=2000)
 
-class ScenarioName:
-    def __init__(self, config=None):
-        self.config = config or {}
-
-    def load_data(self):
-        """Load and preprocess data."""
-        pass
-
-    def run_analysis(self):
-        """Execute complete ML pipeline."""
-        pass
-
-    def generate_report(self):
-        """Create business report with insights."""
-        pass
+predictor = CustomerChurnPredictor(config={"data_size": 2000, "hyperparameter_tuning": False})
+results = predictor.run_complete_analysis()
 ```
 
-## 🎯 Success Stories
+Import the package from the repository root (or with the repository root on
+`PYTHONPATH`); `examples` is a plain namespace package.
 
-**Customer Testimonials:**
+## Shared utilities
 
-- _"Reduced churn by 35% in first quarter using the framework"_ - SaaS Company
-- _"Fraud detection accuracy improved from 78% to 99.2%"_ - Fintech Startup
-- _"Recommendation engine increased revenue by 28%"_ - E-commerce Platform
+| Module | Contents |
+| --- | --- |
+| `utilities/data_loaders.py` | `DataLoader`: synthetic churn, fraud, sales, segmentation, recommendation and diagnosis datasets; `train_test_split` that stratifies automatically for categorical targets |
+| `utilities/evaluation_helpers.py` | `BusinessMetricsCalculator`, `ModelPerformanceEvaluator`, `BusinessReportGenerator`, lift/gain and prediction-interval helpers |
+| `utilities/visualization_helpers.py` | `BusinessVisualizer` dashboards (matplotlib, optional Plotly) and `ModelVisualizer` |
 
-## 📞 Support
+## Adding a scenario
 
-- **Issues**: Report bugs or request features on GitHub
-- **Documentation**: Comprehensive guides in `/docs`
-- **Community**: Join our Slack/Discord for discussions
-- **Training**: Workshop materials in `/workshops`
-
-## 🎉 Quick Wins
-
-**Start with these high-impact, easy-to-implement scenarios:**
-
-1. **Customer Segmentation** (30 min setup, immediate insights)
-2. **Sales Forecasting** (1 hour setup, monthly planning value)
-3. **Churn Prediction** (2 hours setup, ongoing revenue protection)
-
-**Command to get started:**
-
-```bash
-python examples/real_world_scenarios/marketing/customer_segmentation.py --quick-start
-```
-
----
-
-## 📚 See Also
-
-- [API Reference](../../docs/api_reference/index.md)
-- [Algorithm Guides](../../docs/algorithm_guides/)
-- [Troubleshooting](../../docs/troubleshooting.md)
-- [Contributing](../../CONTRIBUTING.md)
+1. Copy an existing script in the closest domain and keep its structure
+   (problem statement docstring, `config` defaults, `run_complete_analysis()`, `main()`).
+2. Generate data in-script or extend `DataLoader`; never download.
+3. Keep the default configuration small enough to finish in under two minutes.
+4. Save figures instead of showing them, and guard execution with
+   `if __name__ == "__main__":`.
+5. Run `pytest tests/test_examples.py -m slow` before opening a PR; the test
+   discovers new scripts automatically.

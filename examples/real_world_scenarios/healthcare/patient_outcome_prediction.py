@@ -30,6 +30,16 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
@@ -38,9 +48,9 @@ from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class PatientOutcomePredictionSystem:
     """Complete patient outcome prediction and risk stratification system."""
@@ -48,8 +58,8 @@ class PatientOutcomePredictionSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize patient outcome prediction system."""
         
-        self.config = config or {
-            'n_patients': 8000,
+        defaults = {
+            'n_patients': 3000,
             'test_size': 0.2,
             'validation_size': 0.1,
             'random_state': 42,
@@ -61,6 +71,8 @@ class PatientOutcomePredictionSystem:
             'high_risk_threshold': 0.7,
             'enable_survival_analysis': True
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -285,26 +297,39 @@ class PatientOutcomePredictionSystem:
         
         # Clean up
         df_clinical['gender'] = (df_clinical['gender'] == 'M').astype(int)
-        df_clinical = df_clinical.drop(['age_category', 'bmi_category', 'specialty', 'admission_type', 'insurance_type'], axis=1)
+        # ``specialty`` is kept (as a string column) for the reporting plots;
+        # the estimators only ever see the numeric columns (see _model_features).
+        df_clinical = df_clinical.drop(['age_category', 'bmi_category', 'admission_type', 'insurance_type'], axis=1)
         
         print(f"Engineered features: {len(df_clinical.columns)} total features")
         
         return df_clinical
     
+    @staticmethod
+    def _model_features(X: pd.DataFrame) -> pd.DataFrame:
+        """Return only the numeric columns used by the estimators.
+
+        ``patient_id`` and ``specialty`` stay in the frame for reporting but
+        must never reach the models.
+        """
+        return X.drop(columns=['patient_id', 'specialty'], errors='ignore').select_dtypes(
+            include=[np.number, bool]
+        ).astype(float)
+
     def train_outcome_models(self, X: pd.DataFrame, targets: Dict[str, pd.Series]) -> Dict[str, Any]:
         """Train models for patient outcome prediction."""
         
         print("Training outcome prediction models...")
         
-        # Split data
-        from sklearn.model_selection import train_test_split
+        # Split data (chronological split so the same rows are used downstream)
+        X_features = self._model_features(X)
         
         split_idx = int(len(X) * (1 - self.config['test_size'] - self.config['validation_size']))
         val_idx = int(len(X) * (1 - self.config['test_size']))
         
-        X_train = X.iloc[:split_idx]
-        X_val = X.iloc[split_idx:val_idx]
-        X_test = X.iloc[val_idx:]
+        X_train = X_features.iloc[:split_idx]
+        X_val = X_features.iloc[split_idx:val_idx]
+        X_test = X_features.iloc[val_idx:]
         
         print(f"Training patients: {len(X_train)}")
         print(f"Validation patients: {len(X_val)}")
@@ -325,32 +350,32 @@ class PatientOutcomePredictionSystem:
             if is_classification:
                 models = {
                     'Random Forest': ClassificationModels().get_random_forest(
-                        n_estimators=200, max_depth=10, class_weight='balanced',
+                        n_estimators=50, max_depth=10, class_weight='balanced',
                         random_state=self.config['random_state']
                     ),
                     'Gradient Boosting': ClassificationModels().get_gradient_boosting(
-                        n_estimators=200, learning_rate=0.1,
+                        n_estimators=50, learning_rate=0.1,
                         random_state=self.config['random_state']
                     ),
                     'Logistic Regression': ClassificationModels().get_logistic_regression(
                         class_weight='balanced', random_state=self.config['random_state']
                     ),
                     'Neural Network': ClassificationModels().get_neural_network(
-                        hidden_layer_sizes=(100, 50), random_state=self.config['random_state']
+                        hidden_layer_sizes=(64, 32), max_iter=200, random_state=self.config['random_state']
                     )
                 }
             else:
                 models = {
-                    'Random Forest': RegressionModels().get_random_forest(
-                        n_estimators=200, max_depth=10,
+                    'Random Forest': RegressionModels().get_random_forest_regression(
+                        n_estimators=50, max_depth=10,
                         random_state=self.config['random_state']
                     ),
-                    'Gradient Boosting': RegressionModels().get_gradient_boosting(
-                        n_estimators=200, learning_rate=0.1,
+                    'Gradient Boosting': RegressionModels().get_gradient_boosting_regression(
+                        n_estimators=50, learning_rate=0.1,
                         random_state=self.config['random_state']
                     ),
-                    'Neural Network': RegressionModels().get_neural_network(
-                        hidden_layer_sizes=(100, 50), random_state=self.config['random_state']
+                    'Neural Network': RegressionModels().get_neural_network_regression(
+                        hidden_layer_sizes=(64, 32), max_iter=200, random_state=self.config['random_state']
                     )
                 }
             
@@ -407,7 +432,7 @@ class PatientOutcomePredictionSystem:
         print("Performing patient risk stratification...")
         
         test_idx = int(len(X) * (1 - self.config['test_size']))
-        X_test = X.iloc[test_idx:]
+        X_test = self._model_features(X.iloc[test_idx:])
         
         risk_scores = {}
         
@@ -611,7 +636,7 @@ class PatientOutcomePredictionSystem:
         # 4. Specialty vs outcomes
         ax4 = plt.subplot(3, 4, 4)
         if 'readmission_30d' in targets:
-            specialty_readmission = X.groupby('specialty')[targets['readmission_30d']].mean()
+            specialty_readmission = targets['readmission_30d'].groupby(X['specialty']).mean()
             
             bars = ax4.bar(specialty_readmission.index, specialty_readmission.values, color='skyblue')
             ax4.set_title('Readmission Rate by Specialty', fontweight='bold')
@@ -647,7 +672,7 @@ class PatientOutcomePredictionSystem:
         # 7. Comorbidity burden analysis
         ax7 = plt.subplot(3, 4, 7)
         if 'mortality_risk' in targets:
-            mortality_by_charlson = X.groupby('charlson_score')[targets['mortality_risk']].mean()
+            mortality_by_charlson = targets['mortality_risk'].groupby(X['charlson_score']).mean()
             
             ax7.plot(mortality_by_charlson.index, mortality_by_charlson.values, 
                     marker='o', linewidth=2, markersize=6, color='red')
@@ -675,7 +700,7 @@ class PatientOutcomePredictionSystem:
         # 9. ICU vs non-ICU outcomes
         ax9 = plt.subplot(3, 4, 9)
         if 'complication_risk' in targets:
-            icu_complications = X.groupby('icu_stay')[targets['complication_risk']].mean()
+            icu_complications = targets['complication_risk'].groupby(X['icu_stay']).mean()
             
             bars = ax9.bar(['No ICU', 'ICU'], icu_complications.values, 
                           color=['lightblue', 'darkblue'])
@@ -727,7 +752,11 @@ class PatientOutcomePredictionSystem:
                     ax10.set_title('High-Risk Patients Summary', fontweight='bold', y=0.95)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "patient_outcome_prediction.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("Visualizations completed")
     
@@ -809,7 +838,7 @@ def main():
     """Main execution function."""
     
     config = {
-        'n_patients': 8000,
+        'n_patients': 3000,
         'outcome_targets': ['readmission_30d', 'recovery_days', 'mortality_risk', 'complication_risk'],
         'high_risk_threshold': 0.7
     }

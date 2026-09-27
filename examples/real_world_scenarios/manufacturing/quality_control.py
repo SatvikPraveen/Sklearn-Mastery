@@ -26,18 +26,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, Any, List
+import time
 import warnings
 warnings.filterwarnings('ignore')
+
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class QualityControlSystem:
     """Complete quality control system pipeline."""
@@ -45,8 +58,8 @@ class QualityControlSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize quality control system."""
         
-        self.config = config or {
-            'n_products': 15000,
+        defaults = {
+            'n_products': 4000,
             'test_size': 0.2,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'svm', 'neural_network'],
@@ -62,6 +75,8 @@ class QualityControlSystem:
                 'rework_cost_major': 200
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -286,37 +301,68 @@ class QualityControlSystem:
         print("✅ Quality pattern analysis completed")
         return patterns
     
+    @staticmethod
+    def _model_features(X: pd.DataFrame) -> pd.DataFrame:
+        """Build the numeric design matrix used by the estimators.
+
+        Process measurements are used as-is, low-cardinality context columns
+        (``shift``, ``machine_id``) are one-hot encoded and pure identifiers
+        (``batch_id``, ``operator``) are dropped.
+        """
+        features = X.drop(columns=['batch_id', 'operator'], errors='ignore')
+        categorical = [c for c in ('shift', 'machine_id') if c in features.columns]
+        features = pd.get_dummies(features, columns=categorical, dtype=float)
+        return features.select_dtypes(include=[np.number, bool]).astype(float)
+
     def train_quality_models(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, Any]:
         """Train multiple models for quality prediction."""
         
         print("🚀 Training quality control models...")
         
-        # Split data
+        # Encode categorical context and split data (stratified on quality class)
+        X_model = self._model_features(X)
         X_train, X_test, y_train, y_test = self.data_loader.train_test_split(
-            X, y, test_size=self.config['test_size']
+            X_model, y, test_size=self.config['test_size']
         )
+        print(f"   Model features: {X_model.shape[1]} (train={len(X_train)}, test={len(X_test)})")
         
         # Initialize models
         models = ClassificationModels()
+        evaluator = MetricsCalculator(task_type='classification')
         results = {}
+        
+        # Small, fast configurations per algorithm; class_weight handles the
+        # imbalance for the estimators that support it.
+        model_params = {
+            'random_forest': {'n_estimators': 50, 'class_weight': 'balanced', 'n_jobs': -1},
+            'gradient_boosting': {'n_estimators': 50, 'max_depth': 3},
+            'svm': {'probability': True, 'class_weight': 'balanced'},
+            'neural_network': {'hidden_layer_sizes': (64, 32), 'max_iter': 200},
+        }
         
         for algorithm in self.config['algorithms']:
             print(f"Training {algorithm}...")
             
-            # Train model
-            model, training_time = models.train_model(
-                X_train, y_train, 
-                algorithm=algorithm,
-                class_weight='balanced'  # Handle class imbalance
+            # Train model (the factory returns a sklearn-compatible wrapper);
+            # distance/gradient based learners get standardised inputs.
+            model = models.get_model(
+                algorithm,
+                random_state=self.config['random_state'],
+                **model_params.get(algorithm, {}),
             )
+            if algorithm in ('svm', 'neural_network'):
+                model = make_pipeline(StandardScaler(), model)
+            start = time.perf_counter()
+            model.fit(X_train, y_train)
+            training_time = time.perf_counter() - start
             
             # Make predictions
             y_pred = model.predict(X_test)
             y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
             
-            # Evaluate model
-            evaluator = ModelEvaluator()
-            metrics = evaluator.classification_metrics(y_test, y_pred, y_pred_proba)
+            # Evaluate model (weighted precision/recall/F1 for the 4 quality classes)
+            metrics = evaluator.calculate_all_metrics(y_test, y_pred, y_proba=y_pred_proba)
+            metrics['f1_score'] = metrics['f1']
             
             # Calculate business metrics
             business_metrics = self.calculate_business_impact(y_test, y_pred)
@@ -514,8 +560,10 @@ class QualityControlSystem:
                 y_test_bin = lb.fit_transform(result['test_data'][1])
                 y_prob_bin = result['probabilities']
                 
-                # Plot ROC for 'pass' class (first class)
-                fpr, tpr, _ = roc_curve(y_test_bin[:, 0], y_prob_bin[:, 0])
+                # Plot ROC for the 'pass' class (probability columns follow the
+                # sorted class order, the same order LabelBinarizer uses)
+                pass_col = list(lb.classes_).index('pass')
+                fpr, tpr, _ = roc_curve(y_test_bin[:, pass_col], y_prob_bin[:, pass_col])
                 auc_score = auc(fpr, tpr)
                 ax8.plot(fpr, tpr, label=f'{alg} (AUC: {auc_score:.3f})', linewidth=2)
         
@@ -575,7 +623,11 @@ class QualityControlSystem:
         ax10.set_ylim(0, 1)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "quality_control.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Quality control visualizations completed")
     

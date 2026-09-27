@@ -30,16 +30,25 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
-from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.regression import RegressionModels
 from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class SalesForecastingSystem:
     """Complete sales forecasting system pipeline."""
@@ -47,7 +56,7 @@ class SalesForecastingSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize sales forecasting system."""
         
-        self.config = config or {
+        defaults = {
             'data_periods': 730,  # 2 years of daily data
             'forecast_horizon': 30,  # Forecast next 30 days
             'test_size': 0.2,
@@ -61,6 +70,8 @@ class SalesForecastingSystem:
                 'holding_cost_rate': 0.02
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -73,11 +84,41 @@ class SalesForecastingSystem:
         self.seasonal_components = {}
         self.best_model = None
         
+    def _load_sales_data(self, n_periods: int) -> Tuple[pd.DataFrame, pd.Series]:
+        """Generate synthetic daily sales with trend, annual and weekly seasonality.
+
+        Mirrors ``DataLoader.load_sales_forecasting_data`` but uses the
+        pandas>=2 ``bfill()`` API for the initial lag values.
+        """
+        rng = np.random.RandomState(self.config['random_state'])
+        dates = pd.date_range(start='2020-01-01', periods=n_periods, freq='D')
+        
+        trend = np.linspace(1000, 1200, n_periods)
+        seasonal = 100 * np.sin(2 * np.pi * np.arange(n_periods) / 365)  # Annual
+        weekly = 50 * np.sin(2 * np.pi * np.arange(n_periods) / 7)      # Weekly
+        noise = rng.normal(0, 30, n_periods)
+        sales = np.maximum(trend + seasonal + weekly + noise, 0)
+        sales_series = pd.Series(sales, name='sales')
+        
+        df = pd.DataFrame({
+            'date': dates,
+            'day_of_week': dates.dayofweek,
+            'month': dates.month,
+            'quarter': dates.quarter,
+            'is_weekend': (dates.dayofweek >= 5).astype(int),
+            'is_holiday': rng.binomial(1, 0.05, n_periods),   # ~5% holidays
+            'promotion': rng.binomial(1, 0.1, n_periods),     # 10% promotion days
+            'temperature': rng.normal(15, 10, n_periods),
+            'sales_lag1': sales_series.shift(1).bfill(),
+            'sales_lag7': sales_series.shift(7).bfill(),
+        })
+        return df, sales_series
+    
     def load_and_analyze_sales_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         """Load and analyze time series sales data."""
         
         print("🔄 Loading sales forecasting dataset...")
-        X, y = self.data_loader.load_sales_forecasting_data(n_periods=self.config['data_periods'])
+        X, y = self._load_sales_data(n_periods=self.config['data_periods'])
         
         print(f"📊 Dataset shape: {X.shape}")
         print(f"📊 Time period: {X['date'].min()} to {X['date'].max()}")
@@ -123,42 +164,49 @@ class SalesForecastingSystem:
         print("\n🔍 Analyzing seasonal patterns...")
         
         try:
-            from scipy import stats
             from statsmodels.tsa.seasonal import seasonal_decompose
             
             # Perform seasonal decomposition
             decomposition = seasonal_decompose(ts_data['sales'], model='additive', period=7)
-            
-            self.seasonal_components = {
-                'trend': decomposition.trend,
-                'seasonal': decomposition.seasonal,
-                'residual': decomposition.resid
-            }
-            
-            # Day of week patterns
-            ts_data['day_of_week'] = ts_data.index.dayofweek
-            dow_sales = ts_data.groupby('day_of_week')['sales'].mean()
-            
-            print("   Day of week sales pattern:")
-            days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            for i, day in enumerate(days):
-                print(f"     {day}: ${dow_sales[i]:,.0f} ({(dow_sales[i]/dow_sales.mean()-1)*100:+.1f}%)")
-            
-            # Monthly patterns
-            ts_data['month'] = ts_data.index.month
-            monthly_sales = ts_data.groupby('month')['sales'].mean()
-            
-            peak_month = monthly_sales.idxmax()
-            low_month = monthly_sales.idxmin()
-            seasonality_strength = (monthly_sales.max() - monthly_sales.min()) / monthly_sales.mean()
-            
-            print(f"   Monthly seasonality strength: {seasonality_strength:.2f}")
-            print(f"   Peak month: {peak_month} (${monthly_sales[peak_month]:,.0f})")
-            print(f"   Low month: {low_month} (${monthly_sales[low_month]:,.0f})")
-            
+            trend, seasonal, resid = decomposition.trend, decomposition.seasonal, decomposition.resid
         except ImportError:
-            print("   Seasonal decomposition not available (statsmodels required)")
-            self.seasonal_components = {}
+            # Lightweight fallback: centred 7-day moving average as the trend and
+            # the mean day-of-week deviation as the weekly seasonal component.
+            print("   statsmodels not installed - using a moving-average decomposition")
+            trend = ts_data['sales'].rolling(window=7, center=True).mean()
+            detrended = ts_data['sales'] - trend
+            dow_effect = detrended.groupby(ts_data.index.dayofweek).mean()
+            seasonal = pd.Series(ts_data.index.dayofweek.map(dow_effect), index=ts_data.index)
+            resid = detrended - seasonal
+        
+        self.seasonal_components = {
+            'trend': trend,
+            'seasonal': seasonal,
+            'residual': resid
+        }
+        
+        # Day of week patterns
+        ts_data['day_of_week'] = ts_data.index.dayofweek
+        dow_sales = ts_data.groupby('day_of_week')['sales'].mean()
+        
+        print("   Day of week sales pattern:")
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        for i, day in enumerate(days):
+            print(f"     {day}: ${dow_sales[i]:,.0f} ({(dow_sales[i]/dow_sales.mean()-1)*100:+.1f}%)")
+        
+        # Monthly patterns
+        ts_data['month'] = ts_data.index.month
+        monthly_sales = ts_data.groupby('month')['sales'].mean()
+        
+        peak_month = monthly_sales.idxmax()
+        low_month = monthly_sales.idxmin()
+        seasonality_strength = (monthly_sales.max() - monthly_sales.min()) / monthly_sales.mean()
+        
+        print(f"   Monthly seasonality strength: {seasonality_strength:.2f}")
+        print(f"   Peak month: {peak_month} (${monthly_sales[peak_month]:,.0f})")
+        print(f"   Low month: {low_month} (${monthly_sales[low_month]:,.0f})")
+    
+        return self.seasonal_components
     
     def engineer_forecasting_features(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         """Create time series forecasting features."""
@@ -195,11 +243,13 @@ class SalesForecastingSystem:
         for alpha in [0.1, 0.3, 0.7]:
             ts_df[f'sales_ema_{alpha}'] = ts_df['sales'].ewm(alpha=alpha).mean().shift(1)
         
-        # 4. Trend and change features
-        ts_df['sales_diff_1'] = ts_df['sales'].diff(1)
-        ts_df['sales_diff_7'] = ts_df['sales'].diff(7)
-        ts_df['sales_pct_change_1'] = ts_df['sales'].pct_change(1)
-        ts_df['sales_pct_change_7'] = ts_df['sales'].pct_change(7)
+        # 4. Trend and change features. NOTE: these must be shifted by one
+        # period; an unshifted diff (sales - sales_lag_1) would let a linear
+        # model reconstruct today's sales exactly (target leakage).
+        ts_df['sales_diff_1'] = ts_df['sales'].diff(1).shift(1)
+        ts_df['sales_diff_7'] = ts_df['sales'].diff(7).shift(1)
+        ts_df['sales_pct_change_1'] = ts_df['sales'].pct_change(1).shift(1)
+        ts_df['sales_pct_change_7'] = ts_df['sales'].pct_change(7).shift(1)
         
         # 5. Calendar features
         ts_df['day_of_year'] = pd.to_datetime(ts_df['date']).dt.dayofyear
@@ -307,24 +357,24 @@ class SalesForecastingSystem:
             'Linear Regression': models.get_linear_regression(),
             'Ridge Regression': models.get_ridge_regression(alpha=1.0),
             'Random Forest': models.get_random_forest_regression(
-                n_estimators=200, 
+                n_estimators=50, 
                 random_state=self.config['random_state']
             ),
             'Gradient Boosting': models.get_gradient_boosting_regression(
-                n_estimators=200,
+                n_estimators=50,
                 learning_rate=0.1,
                 random_state=self.config['random_state']
             )
         }
         
         # Add XGBoost if available
-        try:
+        if 'xgboost' in models.available_models():
             algorithms_to_test['XGBoost'] = models.get_xgboost_regression(
-                n_estimators=200,
+                n_estimators=50,
                 learning_rate=0.1,
                 random_state=self.config['random_state']
             )
-        except:
+        else:
             print("   XGBoost not available, skipping...")
         
         # Train and evaluate models
@@ -527,13 +577,14 @@ class SalesForecastingSystem:
             }
         }
         
-        # Create dashboard
+        # Create dashboard (headless-friendly: saved to disk, no window opened)
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
         fig = self.visualizer.plot_sales_forecast_dashboard(
             viz_data,
-            save_path='sales_forecast_dashboard.png' if save_plots else None
+            save_path=str(figure_dir / "sales_forecasting.png") if save_plots else None
         )
-        
-        plt.show()
+        plt.close("all")
         
         print("✅ Forecasting dashboard created")
     

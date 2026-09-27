@@ -30,16 +30,25 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.regression import RegressionModels
-from sklearn_mastery.models.supervised.classification import ClassificationModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class SupplyChainOptimizer:
     """Complete supply chain optimization system."""
@@ -47,16 +56,20 @@ class SupplyChainOptimizer:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize supply chain optimization system."""
         
-        self.config = config or {
-            'n_records': 50000,
-            'n_products': 500,
-            'n_suppliers': 50,
-            'n_warehouses': 10,
-            'n_customers': 1000,
+        defaults = {
+            'n_records': 5000,
+            'n_products': 100,
+            'n_suppliers': 20,
+            'n_warehouses': 5,
+            'n_customers': 200,
             'time_periods': 365,
             'test_size': 0.2,
             'random_state': 42,
-            'algorithms': ['random_forest', 'gradient_boosting', 'linear_regression', 'neural_network'],
+            'algorithms': ['random_forest', 'gradient_boosting', 'linear_regression'],
+            'model_params': {
+                'random_forest': {'n_estimators': 50, 'max_depth': 12},
+                'gradient_boosting': {'n_estimators': 50, 'max_depth': 3},
+            },
             'optimization_objectives': ['cost', 'delivery_time', 'inventory_level', 'service_level'],
             'business_params': {
                 'holding_cost_rate': 0.25,  # 25% annual holding cost
@@ -68,6 +81,8 @@ class SupplyChainOptimizer:
                 'delivery_weight': 0.3
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -79,6 +94,22 @@ class SupplyChainOptimizer:
         self.supply_chain_data = None
         self.optimization_results = {}
         self.best_models = {}
+        self.model_feature_columns_ = None
+
+    def _encode_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Turn the analysis frame into a numeric model matrix.
+
+        The supplier id is kept in ``X`` for the supplier analysis but is not a
+        model input; ``shortage_cost`` is a linear function of the shortage
+        target and would leak it. Categorical attributes are one-hot encoded and
+        the column layout learned on the first call is reused afterwards.
+        """
+        X = X.drop(columns=[c for c in ['supplier_id', 'shortage_cost'] if c in X.columns])
+        categorical = X.select_dtypes(exclude=[np.number, 'bool']).columns.tolist()
+        X_enc = pd.get_dummies(X, columns=categorical, dtype=float)
+        if self.model_feature_columns_ is None:
+            self.model_feature_columns_ = X_enc.columns.tolist()
+        return X_enc.reindex(columns=self.model_feature_columns_, fill_value=0.0)
         
     def generate_supply_chain_dataset(self) -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
         """Generate comprehensive supply chain dataset."""
@@ -224,9 +255,12 @@ class SupplyChainOptimizer:
         }
         
         # Feature selection
+        # (supplier_id stays for the supplier analysis; ``_encode_features``
+        # removes it before modelling)
+        target_columns = ['total_cost', 'delivery_time', 'shortage', 'service_level']
         feature_cols = [col for col in df.columns if col not in 
-                       ['transaction_id', 'date', 'product_id', 'supplier_id', 
-                        'warehouse_id', 'customer_id'] + list(targets.keys())]
+                       ['transaction_id', 'date', 'product_id', 
+                        'warehouse_id', 'customer_id'] + target_columns]
         
         X = df[feature_cols]
         
@@ -346,7 +380,7 @@ class SupplyChainOptimizer:
             'avg_total_cost': targets['cost_optimization'].mean(),
             'cost_std': targets['cost_optimization'].std(),
             'high_cost_threshold': targets['cost_optimization'].quantile(0.9),
-            'cost_by_category': X.groupby('product_category')['total_cost'].mean().to_dict()
+            'cost_by_category': targets['cost_optimization'].groupby(X['product_category']).mean().to_dict()
         }
         
         # 2. Delivery performance
@@ -373,7 +407,11 @@ class SupplyChainOptimizer:
         }
         
         # 5. Supplier performance
-        supplier_performance = X.groupby('supplier_id').agg({
+        supplier_frame = X[['supplier_id', 'supplier_reliability', 'supplier_quality']].assign(
+            total_cost=targets['cost_optimization'].values,
+            delivery_time=targets['delivery_optimization'].values,
+        )
+        supplier_performance = supplier_frame.groupby('supplier_id').agg({
             'supplier_reliability': 'first',
             'supplier_quality': 'first',
             'total_cost': 'mean',
@@ -390,7 +428,7 @@ class SupplyChainOptimizer:
         patterns['geographic_analysis'] = {
             'avg_supplier_distance': X['supplier_distance'].mean(),
             'avg_customer_distance': X['customer_distance'].mean(),
-            'distance_cost_correlation': np.corrcoef(X['total_distance'], X['total_cost'])[0, 1]
+            'distance_cost_correlation': np.corrcoef(X['total_distance'], targets['cost_optimization'])[0, 1]
         }
         
         # 7. Seasonal patterns
@@ -415,21 +453,16 @@ class SupplyChainOptimizer:
         for objective, target in targets.items():
             print(f"\nTraining models for {objective}...")
             
-            # Split data
+            # Split data (categoricals one-hot encoded for the models)
+            X_encoded = self._encode_features(X)
             X_train, X_test, y_train, y_test = self.data_loader.train_test_split(
-                X, target, test_size=self.config['test_size']
+                X_encoded, target, test_size=self.config['test_size']
             )
             
-            # Choose model type based on objective
-            if objective == 'service_optimization':
-                # Service level is between 0 and 1, use regression
-                models = RegressionModels()
-            elif objective == 'inventory_optimization':
-                # Shortage can be 0 or positive, use regression
-                models = RegressionModels()
-            else:
-                # Cost and delivery time are continuous, use regression
-                models = RegressionModels()
+            # Every objective (cost, delivery time, shortage, service level) is a
+            # continuous quantity, so the same regression toolkit serves all of them
+            models = RegressionModels(random_state=self.config['random_state'])
+            evaluator = MetricsCalculator(task_type='regression')
             
             objective_results = {}
             
@@ -438,15 +471,16 @@ class SupplyChainOptimizer:
                 
                 # Train model
                 model, training_time = models.train_model(
-                    X_train, y_train, algorithm=algorithm
+                    X_train, y_train, algorithm=algorithm,
+                    **self.config['model_params'].get(algorithm, {})
                 )
                 
                 # Make predictions
                 y_pred = model.predict(X_test)
                 
                 # Evaluate model
-                evaluator = ModelEvaluator()
-                metrics = evaluator.regression_metrics(y_test, y_pred)
+                metrics = evaluator.calculate_all_metrics(y_test, y_pred)
+                metrics['r2_score'] = metrics['r2']
                 
                 # Calculate business impact
                 business_metrics = self.calculate_optimization_impact(
@@ -556,76 +590,74 @@ class SupplyChainOptimizer:
         scenarios = []
         
         # Sample subset for optimization (computational efficiency)
-        sample_size = min(1000, len(X))
+        sample_size = min(500, len(X))
         X_sample = X.sample(n=sample_size, random_state=self.config['random_state'])
+        X_base = self._encode_features(X_sample)
         
-        for idx, row in X_sample.iterrows():
-            base_scenario = row.copy()
+        def predict_all(frame: pd.DataFrame) -> Dict[str, np.ndarray]:
+            """Score a whole scenario frame with the four objective models at once."""
+            return {
+                'cost': np.asarray(cost_model.predict(frame)),
+                'delivery': np.asarray(delivery_model.predict(frame)),
+                'shortage': np.asarray(inventory_model.predict(frame)),
+                'service': np.asarray(service_model.predict(frame)),
+            }
+        
+        # Predict current performance for every sampled transaction
+        current = predict_all(X_base)
+        
+        # Scenario 1: Cost optimization (reduce supplier cost variance)
+        cost_opt = X_base.copy()
+        cost_opt['supplier_reliability'] = np.minimum(1.0, cost_opt['supplier_reliability'] + 0.1)
+        cost_opt['supplier_distance'] = cost_opt['supplier_distance'] * 0.9
+        
+        # Scenario 2: Delivery optimization
+        delivery_opt = X_base.copy()
+        delivery_opt['supplier_distance'] = delivery_opt['supplier_distance'] * 0.7
+        delivery_opt['customer_distance'] = delivery_opt['customer_distance'] * 0.8
+        
+        # Scenario 3: Service optimization
+        service_opt = X_base.copy()
+        service_opt['safety_stock'] = service_opt['safety_stock'] * 1.5
+        service_opt['supplier_quality'] = np.minimum(1.0, service_opt['supplier_quality'] + 0.1)
+        
+        scenario_specs = [
+            ('Cost Optimized', 'Improved supplier reliability, reduced distance', predict_all(cost_opt)),
+            ('Delivery Optimized', 'Reduced transportation distances', predict_all(delivery_opt)),
+            ('Service Optimized', 'Increased safety stock, improved supplier quality', predict_all(service_opt)),
+        ]
+        
+        weights = self.config['business_params']
+        service_weight = 1 - weights['cost_weight'] - weights['delivery_weight']
+        
+        for i, idx in enumerate(X_sample.index):
+            current_cost = float(current['cost'][i])
+            current_delivery = float(current['delivery'][i])
+            current_shortage = float(current['shortage'][i])
+            current_service = float(current['service'][i])
             
-            # Predict current performance
-            current_cost = cost_model.predict([row])[0]
-            current_delivery = delivery_model.predict([row])[0]
-            current_shortage = inventory_model.predict([row])[0]
-            current_service = service_model.predict([row])[0]
-            
-            # Generate optimization alternatives
+            # Generate optimization alternatives and their improvement scores
             optimizations = []
-            
-            # Scenario 1: Cost optimization (reduce supplier cost variance)
-            cost_opt = base_scenario.copy()
-            cost_opt['supplier_reliability'] = min(1.0, cost_opt['supplier_reliability'] + 0.1)
-            cost_opt['supplier_distance'] = cost_opt['supplier_distance'] * 0.9
-            
-            optimizations.append({
-                'scenario': 'Cost Optimized',
-                'predicted_cost': cost_model.predict([cost_opt])[0],
-                'predicted_delivery': delivery_model.predict([cost_opt])[0],
-                'predicted_shortage': inventory_model.predict([cost_opt])[0],
-                'predicted_service': service_model.predict([cost_opt])[0],
-                'changes': 'Improved supplier reliability, reduced distance'
-            })
-            
-            # Scenario 2: Delivery optimization
-            delivery_opt = base_scenario.copy()
-            delivery_opt['supplier_distance'] = delivery_opt['supplier_distance'] * 0.7
-            delivery_opt['customer_distance'] = delivery_opt['customer_distance'] * 0.8
-            
-            optimizations.append({
-                'scenario': 'Delivery Optimized',
-                'predicted_cost': cost_model.predict([delivery_opt])[0],
-                'predicted_delivery': delivery_model.predict([delivery_opt])[0],
-                'predicted_shortage': inventory_model.predict([delivery_opt])[0],
-                'predicted_service': service_model.predict([delivery_opt])[0],
-                'changes': 'Reduced transportation distances'
-            })
-            
-            # Scenario 3: Service optimization
-            service_opt = base_scenario.copy()
-            service_opt['safety_stock'] = service_opt['safety_stock'] * 1.5
-            service_opt['supplier_quality'] = min(1.0, service_opt['supplier_quality'] + 0.1)
-            
-            optimizations.append({
-                'scenario': 'Service Optimized',
-                'predicted_cost': cost_model.predict([service_opt])[0],
-                'predicted_delivery': delivery_model.predict([service_opt])[0],
-                'predicted_shortage': inventory_model.predict([service_opt])[0],
-                'predicted_service': service_model.predict([service_opt])[0],
-                'changes': 'Increased safety stock, improved supplier quality'
-            })
-            
-            # Calculate improvement scores
-            for opt in optimizations:
-                cost_improvement = (current_cost - opt['predicted_cost']) / current_cost
-                delivery_improvement = (current_delivery - opt['predicted_delivery']) / current_delivery
-                service_improvement = (opt['predicted_service'] - current_service) / current_service
+            for scenario_name, changes, preds in scenario_specs:
+                opt = {
+                    'scenario': scenario_name,
+                    'predicted_cost': float(preds['cost'][i]),
+                    'predicted_delivery': float(preds['delivery'][i]),
+                    'predicted_shortage': float(preds['shortage'][i]),
+                    'predicted_service': float(preds['service'][i]),
+                    'changes': changes,
+                }
+                cost_improvement = (current_cost - opt['predicted_cost']) / max(current_cost, 1e-9)
+                delivery_improvement = (current_delivery - opt['predicted_delivery']) / max(current_delivery, 1e-9)
+                service_improvement = (opt['predicted_service'] - current_service) / max(current_service, 1e-9)
                 
                 # Weighted improvement score
                 opt['improvement_score'] = (
-                    cost_improvement * self.config['business_params']['cost_weight'] +
-                    delivery_improvement * self.config['business_params']['delivery_weight'] +
-                    service_improvement * (1 - self.config['business_params']['cost_weight'] - 
-                                         self.config['business_params']['delivery_weight'])
+                    cost_improvement * weights['cost_weight'] +
+                    delivery_improvement * weights['delivery_weight'] +
+                    service_improvement * service_weight
                 )
+                optimizations.append(opt)
             
             # Select best optimization
             best_optimization = max(optimizations, key=lambda x: x['improvement_score'])
@@ -793,8 +825,8 @@ class SupplyChainOptimizer:
         ax11.set_title('Supplier Performance Matrix', fontweight='bold')
         
         # Add quadrant lines
-        ax11.axhline(supplier_reliability.median(), color='gray', linestyle='--', alpha=0.5)
-        ax11.axvline(supplier_costs.median(), color='gray', linestyle='--', alpha=0.5)
+        ax11.axhline(np.median(supplier_reliability), color='gray', linestyle='--', alpha=0.5)
+        ax11.axvline(np.median(supplier_costs), color='gray', linestyle='--', alpha=0.5)
         
         # 12. Inventory turnover by category
         ax12 = plt.subplot(4, 5, 12)
@@ -861,7 +893,11 @@ class SupplyChainOptimizer:
         ax15.set_title('Supply Chain Optimization Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "supply_chain_optimization.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Supply chain optimization visualizations completed")
     

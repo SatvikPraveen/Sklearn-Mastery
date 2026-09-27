@@ -29,15 +29,25 @@ from typing import Dict, Tuple, Any, List
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class AnomalyDetectionSystem:
     """Complete anomaly detection system pipeline."""
@@ -45,7 +55,7 @@ class AnomalyDetectionSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize anomaly detection system."""
         
-        self.config = config or {
+        defaults = {
             'n_samples': 20000,
             'contamination_rate': 0.05,  # 5% anomalies
             'test_size': 0.2,
@@ -59,6 +69,8 @@ class AnomalyDetectionSystem:
                 'avg_incident_cost': 50000
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])

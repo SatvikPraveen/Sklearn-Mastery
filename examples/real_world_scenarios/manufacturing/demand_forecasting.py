@@ -30,15 +30,25 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.regression import RegressionModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class DemandForecastingSystem:
     """Complete demand forecasting system for manufacturing and retail."""
@@ -46,14 +56,18 @@ class DemandForecastingSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize demand forecasting system."""
         
-        self.config = config or {
-            'n_products': 200,
-            'n_stores': 50,
-            'n_days': 1095,  # 3 years of data
+        defaults = {
+            'n_products': 10,
+            'n_stores': 4,
+            'n_days': 548,  # 18 months of daily data per product-store pair
             'forecast_horizons': [7, 30, 90],  # days
             'test_size': 0.2,
             'random_state': 42,
-            'algorithms': ['random_forest', 'gradient_boosting', 'linear_regression', 'neural_network'],
+            'algorithms': ['random_forest', 'gradient_boosting', 'linear_regression'],
+            'model_params': {
+                'random_forest': {'n_estimators': 50, 'max_depth': 12},
+                'gradient_boosting': {'n_estimators': 50, 'max_depth': 3},
+            },
             'seasonality_types': ['weekly', 'monthly', 'quarterly', 'yearly'],
             'business_params': {
                 'holding_cost_per_unit': 2.5,
@@ -63,6 +77,8 @@ class DemandForecastingSystem:
                 'safety_stock_multiplier': 1.65  # For 95% service level
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -74,6 +90,22 @@ class DemandForecastingSystem:
         self.demand_data = None
         self.forecast_results = {}
         self.best_models = {}
+        self.model_feature_columns_ = None
+
+    def _encode_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Turn the analysis frame into a numeric model matrix.
+
+        Identifier and date columns are dropped and categorical attributes
+        (category, lifecycle stage, store size/location/region) are one-hot
+        encoded. The column layout learned on the first call is reused so that
+        training, test and forecast frames always line up.
+        """
+        X = X.drop(columns=[c for c in ['date', 'product_id', 'store_id'] if c in X.columns])
+        categorical = X.select_dtypes(exclude=[np.number, 'bool']).columns.tolist()
+        X_enc = pd.get_dummies(X, columns=categorical, dtype=float)
+        if self.model_feature_columns_ is None:
+            self.model_feature_columns_ = X_enc.columns.tolist()
+        return X_enc.reindex(columns=self.model_feature_columns_, fill_value=0.0)
         
     def generate_demand_dataset(self) -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
         """Generate comprehensive demand time series dataset."""
@@ -157,22 +189,26 @@ class DemandForecastingSystem:
         # Add lag features and moving averages
         df = self._add_time_series_features(df)
         
-        # Create targets for different forecast horizons
-        targets = {}
+        # Create targets for different forecast horizons (future demand of the
+        # same product-store pair, shifted back so each row is a training example)
+        target_cols = []
         for horizon in self.config['forecast_horizons']:
             target_col = f'demand_future_{horizon}d'
             df[target_col] = df.groupby(['product_id', 'store_id'])['demand'].shift(-horizon)
-            targets[f'forecast_{horizon}d'] = df[target_col].dropna()
+            target_cols.append(target_col)
         
-        # Remove rows with NaN targets (due to shifting)
-        max_horizon = max(self.config['forecast_horizons'])
-        df_clean = df[:-max_horizon].copy()
+        # Remove rows without a full set of targets (the tail of every series),
+        # then order chronologically so the train/test split is a true time split
+        df_clean = (df.dropna(subset=target_cols)
+                      .sort_values(['date', 'product_id', 'store_id'])
+                      .reset_index(drop=True))
         
-        # Feature selection
-        feature_cols = [col for col in df_clean.columns if not col.startswith('demand_future_') 
-                       and col not in ['product_id', 'store_id']]
+        # Feature selection (ids and date stay for analysis/forecasting; the
+        # models see the encoded matrix from ``_encode_features``)
+        feature_cols = [col for col in df_clean.columns if not col.startswith('demand_future_')]
         
         X = df_clean[feature_cols]
+        targets = {}
         
         # Update targets to match cleaned data
         for horizon in self.config['forecast_horizons']:
@@ -359,23 +395,27 @@ class DemandForecastingSystem:
         for lag in lags:
             df[f'demand_lag_{lag}'] = df.groupby(['product_id', 'store_id'])['demand'].shift(lag)
         
-        # Add moving averages
+        grouped_demand = df.groupby(['product_id', 'store_id'])['demand']
+        
+        # Add moving averages (computed within each product-store series)
         windows = [7, 14, 30, 90]  # 1 week, 2 weeks, 1 month, 3 months
         for window in windows:
-            df[f'demand_ma_{window}'] = df.groupby(['product_id', 'store_id'])['demand'].rolling(
-                window=window, min_periods=1
-            ).mean().reset_index(0, drop=True)
+            df[f'demand_ma_{window}'] = grouped_demand.transform(
+                lambda s, w=window: s.rolling(window=w, min_periods=1).mean()
+            )
         
         # Add trend features
-        df['demand_trend_7d'] = (df.groupby(['product_id', 'store_id'])['demand'].shift(1) - 
-                                df.groupby(['product_id', 'store_id'])['demand'].shift(7))
+        df['demand_trend_7d'] = grouped_demand.shift(1) - grouped_demand.shift(7)
         
-        df['demand_std_30d'] = df.groupby(['product_id', 'store_id'])['demand'].rolling(
-            window=30, min_periods=1
-        ).std().reset_index(0, drop=True)
+        df['demand_std_30d'] = grouped_demand.transform(
+            lambda s: s.rolling(window=30, min_periods=1).std()
+        )
         
-        # Fill NaN values with forward fill and then backward fill
-        df = df.groupby(['product_id', 'store_id']).fillna(method='ffill').fillna(method='bfill')
+        # Fill NaN values (from lags/trends) with forward then backward fill within each series
+        derived_cols = [c for c in df.columns if c.startswith(('demand_lag_', 'demand_ma_',
+                                                               'demand_trend_', 'demand_std_'))]
+        df[derived_cols] = df.groupby(['product_id', 'store_id'])[derived_cols].ffill()
+        df[derived_cols] = df.groupby(['product_id', 'store_id'])[derived_cols].bfill()
         
         return df
     
@@ -492,8 +532,8 @@ class DemandForecastingSystem:
                 
             print(f"\nTraining models for {horizon_key}...")
             
-            # Align X with target (same length)
-            X_aligned = X.iloc[:len(target)].copy()
+            # Align X with target (same length) and encode for the models
+            X_aligned = self._encode_features(X.iloc[:len(target)])
             
             # Split data (maintaining time order for time series)
             split_index = int(len(X_aligned) * (1 - self.config['test_size']))
@@ -506,22 +546,24 @@ class DemandForecastingSystem:
             horizon_results = {}
             
             # Initialize models
-            models = RegressionModels()
+            models = RegressionModels(random_state=self.config['random_state'])
+            evaluator = MetricsCalculator(task_type='regression')
             
             for algorithm in self.config['algorithms']:
                 print(f"  Training {algorithm}...")
                 
                 # Train model
                 model, training_time = models.train_model(
-                    X_train, y_train, algorithm=algorithm
+                    X_train, y_train, algorithm=algorithm,
+                    **self.config['model_params'].get(algorithm, {})
                 )
                 
                 # Make predictions
                 y_pred = model.predict(X_test)
                 
                 # Evaluate model
-                evaluator = ModelEvaluator()
-                metrics = evaluator.regression_metrics(y_test, y_pred)
+                metrics = evaluator.calculate_all_metrics(y_test, y_pred)
+                metrics['r2_score'] = metrics['r2']
                 
                 # Calculate business impact
                 business_metrics = self.calculate_forecasting_impact(
@@ -538,7 +580,7 @@ class DemandForecastingSystem:
                 }
                 
                 print(f"    ✅ {algorithm} - R²: {metrics['r2_score']:.3f}, "
-                      f"MAPE: {metrics.get('mape', 0):.1f}%")
+                      f"MAPE: {metrics.get('mape', 0) * 100:.1f}%")
             
             # Find best model for this horizon
             best_algorithm = max(horizon_results.keys(), 
@@ -609,54 +651,40 @@ class DemandForecastingSystem:
         
         print("🔮 Generating demand forecasts...")
         
-        forecasts = []
-        
         # Get the latest data for each product-store combination
         latest_data = X.groupby(['product_id', 'store_id']).last().reset_index()
+        latest_data = latest_data.head(20)  # Sample for demonstration
         
-        for _, row in latest_data.head(100).iterrows():  # Sample for demonstration
-            base_features = row.drop(['product_id', 'store_id']).to_dict()
+        # Build one scenario row per (product-store, future period) and score
+        # them in a single batch per horizon instead of one prediction at a time
+        scenario_frames = []
+        for period in range(1, n_periods + 1):
+            scenario = latest_data.copy()
+            scenario['forecast_period'] = period
             
-            for period in range(1, n_periods + 1):
-                # Update time-based features
-                forecast_features = base_features.copy()
-                
-                # Simple time progression (would be more sophisticated in production)
-                if 'day_of_year' in forecast_features:
-                    forecast_features['day_of_year'] = (forecast_features['day_of_year'] + period) % 365
-                if 'day_of_week' in forecast_features:
-                    forecast_features['day_of_week'] = (forecast_features['day_of_week'] + period) % 7
-                if 'month' in forecast_features:
-                    forecast_features['month'] = ((forecast_features['month'] - 1 + period // 30) % 12) + 1
-                
-                # Generate predictions for each horizon
-                predictions = {}
-                for horizon_key, horizon_data in models_dict.items():
-                    model = horizon_data['best_performance']['model']
-                    
-                    # Prepare features (ensure same order as training)
-                    feature_df = pd.DataFrame([forecast_features])
-                    
-                    # Handle missing columns
-                    for col in X.columns:
-                        if col not in feature_df.columns and col not in ['product_id', 'store_id']:
-                            feature_df[col] = 0
-                    
-                    # Reorder columns to match training data
-                    feature_df = feature_df.reindex(columns=X.drop(['product_id', 'store_id'], axis=1).columns, fill_value=0)
-                    
-                    pred = model.predict(feature_df)[0]
-                    predictions[horizon_key] = max(0, pred)
-                
-                forecasts.append({
-                    'product_id': row['product_id'],
-                    'store_id': row['store_id'],
-                    'forecast_period': period,
-                    'forecast_date': pd.Timestamp.now() + pd.Timedelta(days=period),
-                    **predictions
-                })
+            # Simple time progression (would be more sophisticated in production)
+            if 'day_of_year' in scenario.columns:
+                scenario['day_of_year'] = (scenario['day_of_year'] + period) % 365
+            if 'day_of_week' in scenario.columns:
+                scenario['day_of_week'] = (scenario['day_of_week'] + period) % 7
+            if 'month' in scenario.columns:
+                scenario['month'] = ((scenario['month'] - 1 + period // 30) % 12) + 1
+            
+            scenario_frames.append(scenario)
         
-        forecast_df = pd.DataFrame(forecasts)
+        scenarios = pd.concat(scenario_frames, ignore_index=True)
+        
+        # Prepare features (same encoding and column order as training)
+        feature_df = self._encode_features(scenarios.drop(columns=['forecast_period']))
+        
+        forecast_df = scenarios[['product_id', 'store_id', 'forecast_period']].copy()
+        forecast_df['forecast_date'] = (pd.Timestamp.now().normalize() +
+                                        pd.to_timedelta(forecast_df['forecast_period'], unit='D'))
+        
+        # Generate predictions for each horizon
+        for horizon_key, horizon_data in models_dict.items():
+            model = horizon_data['best_performance']['model']
+            forecast_df[horizon_key] = np.maximum(0, model.predict(feature_df))
         
         print(f"✅ Generated {len(forecast_df)} forecast records")
         return forecast_df
@@ -942,7 +970,11 @@ Key Recommendations:
         ax15.set_title('Business Impact Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "demand_forecasting.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ Demand forecasting visualizations completed")
     
@@ -980,7 +1012,7 @@ Key Recommendations:
 - **Products Analyzed**: {self.config['n_products']}
 - **Store Locations**: {self.config['n_stores']}
 - **Time Period**: {self.config['n_days']} days ({self.config['n_days']/365:.1f} years)
-- **Forecast Horizons**: {', '.join([h.replace('forecast_', '').replace('d', ' days') for h in self.config['forecast_horizons']])}
+- **Forecast Horizons**: {', '.join([f'{h} days' for h in self.config['forecast_horizons']])}
 
 **Demand Characteristics**:
 - **Average Daily Demand**: {patterns['demand_overview']['avg_daily_demand']:.1f} units

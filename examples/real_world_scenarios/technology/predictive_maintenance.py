@@ -30,6 +30,16 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
@@ -37,9 +47,9 @@ from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
 from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class PredictiveMaintenanceSystem:
     """Complete predictive maintenance system pipeline."""
@@ -47,9 +57,9 @@ class PredictiveMaintenanceSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize predictive maintenance system."""
         
-        self.config = config or {
-            'n_machines': 100,
-            'n_days': 365,
+        defaults = {
+            'n_machines': 12,   # kept small so the example runs in well under a minute
+            'n_days': 60,
             'sampling_frequency': 'hourly',  # hourly sensor readings
             'test_size': 0.2,
             'random_state': 42,
@@ -63,6 +73,8 @@ class PredictiveMaintenanceSystem:
                 'equipment_replacement_cost': 500000
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -105,7 +117,7 @@ class PredictiveMaintenanceSystem:
         end_date = start_date + timedelta(days=self.config['n_days'])
         
         # Create hourly timestamps
-        timestamps = pd.date_range(start=start_date, end=end_date, freq='H')
+        timestamps = pd.date_range(start=start_date, end=end_date, freq='h')
         
         sensor_records = []
         
@@ -274,13 +286,19 @@ class PredictiveMaintenanceSystem:
                 )
         
         # 2. Trend analysis (degradation detection)
+        # Slope of a least-squares line over the last 6 readings. For equally
+        # spaced x = 0..5 the OLS slope is sum((x - mean(x)) * y) / sum((x - mean(x))^2),
+        # which is a fixed-weight rolling dot product -- far faster than
+        # np.polyfit inside rolling().apply().
+        window = 6
+        x_centered = np.arange(window) - (window - 1) / 2
+        slope_weights = x_centered / np.sum(x_centered ** 2)
         for col in ['temperature', 'vibration', 'efficiency']:
-            X_maintenance[f'{col}_trend_6h'] = (
-                self.sensor_data.groupby('equipment_id')[col]
-                .rolling(window=6)
-                .apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) > 1 else 0)
-                .reset_index(level=0, drop=True)
+            grouped = self.sensor_data.groupby('equipment_id')[col]
+            trend = sum(
+                grouped.shift(window - 1 - i) * w for i, w in enumerate(slope_weights)
             )
+            X_maintenance[f'{col}_trend_6h'] = trend
         
         # 3. Anomaly indicators
         X_maintenance['temperature_anomaly'] = (
@@ -333,7 +351,7 @@ class PredictiveMaintenanceSystem:
         X_maintenance = X_maintenance.drop(columns=[col for col in columns_to_drop if col in X_maintenance.columns])
         
         # Fill NaN values from rolling calculations
-        X_maintenance = X_maintenance.fillna(method='bfill').fillna(0)
+        X_maintenance = X_maintenance.bfill().fillna(0)
         
         print(f"✅ Engineered maintenance features: {X_maintenance.shape[1]} total features")
         print(f"📊 New features added: {X_maintenance.shape[1] - X.shape[1]}")
@@ -363,15 +381,15 @@ class PredictiveMaintenanceSystem:
         # Configure models for predictive maintenance
         algorithms_to_test = {
             'Random Forest': models.get_random_forest(
-                n_estimators=200,
-                max_depth=15,
+                n_estimators=50,
+                max_depth=10,
                 class_weight='balanced',
                 random_state=self.config['random_state']
             ),
             'Gradient Boosting': models.get_gradient_boosting(
-                n_estimators=200,
+                n_estimators=50,
                 learning_rate=0.1,
-                max_depth=6,
+                max_depth=3,
                 random_state=self.config['random_state']
             )
         }
@@ -392,10 +410,8 @@ class PredictiveMaintenanceSystem:
             # Fit model
             model.fit(X_train, y_train)
             
-            # Evaluate model
-            performance = self.model_evaluator.evaluate_classification_model(
-                model, X_test, y_test, X_train, y_train, cv_folds=3
-            )
+            # Evaluate model (multi-class states, so use the label-agnostic helper)
+            performance = self._evaluate_multiclass_model(model, X_test, y_test)
             
             # Calculate maintenance-specific metrics
             y_pred = model.predict(X_test)
@@ -462,6 +478,34 @@ class PredictiveMaintenanceSystem:
         self.test_data = (X_test, y_test)
         
         return model_results
+    
+    @staticmethod
+    def _evaluate_multiclass_model(model, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, Any]:
+        """Standard classification metrics for the multi-class maintenance states.
+
+        The shared ``ModelPerformanceEvaluator`` assumes a binary target, so this
+        helper computes weighted precision/recall/F1 and one-vs-rest ROC AUC.
+        """
+        from sklearn.metrics import (accuracy_score, precision_score, recall_score,
+                                     f1_score, roc_auc_score, confusion_matrix)
+        
+        y_pred = model.predict(X_test)
+        metrics = {
+            'accuracy': accuracy_score(y_test, y_pred),
+            'precision': precision_score(y_test, y_pred, average='weighted', zero_division=0),
+            'recall': recall_score(y_test, y_pred, average='weighted', zero_division=0),
+            'f1': f1_score(y_test, y_pred, average='weighted', zero_division=0),
+            'confusion_matrix': confusion_matrix(y_test, y_pred),
+        }
+        if hasattr(model, 'predict_proba'):
+            y_proba = model.predict_proba(X_test)
+            classes = list(getattr(model, 'classes_', np.unique(y_test)))
+            present = [i for i, c in enumerate(classes) if c in set(y_test)]
+            if len(present) == y_proba.shape[1] and len(present) > 2:
+                metrics['auc'] = roc_auc_score(y_test, y_proba, multi_class='ovr', average='weighted')
+        if hasattr(model, 'feature_importances_'):
+            metrics['feature_importance'] = model.feature_importances_
+        return metrics
     
     def calculate_maintenance_metrics(self, y_true: pd.Series, y_pred: List, y_proba: np.ndarray = None) -> Dict[str, float]:
         """Calculate maintenance-specific performance metrics."""
@@ -634,8 +678,8 @@ def main():
     
     # Configuration for predictive maintenance
     config = {
-        'n_machines': 100,
-        'n_days': 365,
+        'n_machines': 12,
+        'n_days': 60,
         'algorithms': ['random_forest', 'gradient_boosting', 'anomaly_detection'],
         'business_params': {
             'downtime_cost_per_hour': 5000,

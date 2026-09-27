@@ -27,20 +27,31 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, Any, List, Optional
 from datetime import datetime, timedelta
+import time
 import warnings
 import re
 import string
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
 from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.models.supervised.classification import ClassificationModels
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import MetricsCalculator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class NLPProcessingSystem:
     """Complete natural language processing system for enterprise applications."""
@@ -48,8 +59,8 @@ class NLPProcessingSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize NLP processing system."""
         
-        self.config = config or {
-            'n_documents': 25000,
+        defaults = {
+            'n_documents': 4000,   # small enough to train 16 models in well under a minute
             'test_size': 0.2,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'logistic_regression', 'neural_network'],
@@ -64,6 +75,8 @@ class NLPProcessingSystem:
                 'cost_per_error': 50.0  # $50 cost per processing error
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -162,6 +175,8 @@ class NLPProcessingSystem:
                        ['document_category', 'sentiment_label', 'has_entities', 'summarization_needed']]
         
         X = df[feature_cols].fillna(0)
+        # Numeric columns are what the models consume (see train_nlp_models)
+        self.feature_columns_ = list(X.select_dtypes(include=[np.number, 'bool']).columns)
         
         print(f"✅ Generated {len(df):,} NLP documents")
         print(f"📊 Document types: {len(self.config['document_types'])}, Languages: {len(self.config['languages'])}")
@@ -619,8 +634,14 @@ class NLPProcessingSystem:
             'processing_complexity': 'mean'
         }).round(2)
         
+        # Nest the (feature, statistic) column MultiIndex as {feature: {stat: {doc_type: value}}}
+        stats_by_type = {
+            feature: doc_type_stats[feature].to_dict()
+            for feature in doc_type_stats.columns.get_level_values(0).unique()
+        }
+        
         patterns['document_analysis'] = {
-            'stats_by_type': doc_type_stats.to_dict(),
+            'stats_by_type': stats_by_type,
             'most_complex_type': X.groupby('document_type')['complexity_score'].mean().idxmax(),
             'longest_documents': X.groupby('document_type')['text_length'].mean().idxmax()
         }
@@ -715,56 +736,55 @@ class NLPProcessingSystem:
                 print(f"  ⚠️ No valid data for {task_name}")
                 continue
             
+            # Models consume the numeric engineered features only; the raw
+            # categorical columns are already one-hot encoded alongside them.
+            X_numeric = X_clean[self.feature_columns_]
+            
             # Split data
             X_train, X_test, y_train, y_test = self.data_loader.train_test_split(
-                X_clean, target_clean, test_size=self.config['test_size']
+                X_numeric, target_clean, test_size=self.config['test_size']
             )
             
             task_results = {}
             
             # Use classification models for all NLP tasks
             models = ClassificationModels()
+            evaluator = MetricsCalculator(task_type='classification')
             
             for algorithm in self.config['algorithms']:
                 print(f"  Training {algorithm}...")
                 
-                try:
-                    # Train model
-                    model, training_time = models.train_model(
-                        X_train, y_train, 
-                        algorithm=algorithm,
-                        class_weight='balanced'
-                    )
-                    
-                    # Make predictions
-                    y_pred = model.predict(X_test)
-                    y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
-                    
-                    # Evaluate model
-                    evaluator = ModelEvaluator()
-                    metrics = evaluator.classification_metrics(y_test, y_pred, y_pred_proba)
-                    
-                    # Calculate business impact
-                    business_metrics = self.calculate_nlp_impact(
-                        task_name, y_test, y_pred, X_test
-                    )
-                    
-                    task_results[algorithm] = {
-                        'model': model,
-                        'predictions': y_pred,
-                        'probabilities': y_pred_proba,
-                        'metrics': metrics,
-                        'business_metrics': business_metrics,
-                        'training_time': training_time,
-                        'test_data': (X_test, y_test)
-                    }
-                    
-                    print(f"    ✅ {algorithm} - Accuracy: {metrics['accuracy']:.3f}, "
-                          f"F1: {metrics['f1_score']:.3f}")
+                # Build and train the model (small, fast configurations)
+                model = models.get_model(algorithm, **self._model_params(algorithm))
+                start_time = time.perf_counter()
+                model.fit(X_train, y_train)
+                training_time = time.perf_counter() - start_time
                 
-                except Exception as e:
-                    print(f"    ❌ {algorithm} failed: {str(e)}")
-                    continue
+                # Make predictions
+                y_pred = model.predict(X_test)
+                y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
+                
+                # Evaluate model
+                metrics = evaluator.calculate_all_metrics(y_test, y_pred, y_proba=y_pred_proba)
+                metrics['f1_score'] = metrics['f1']
+                
+                # Calculate business impact
+                business_metrics = self.calculate_nlp_impact(
+                    task_name, y_test, y_pred, X_test
+                )
+                
+                task_results[algorithm] = {
+                    'model': model,
+                    'predictions': y_pred,
+                    'probabilities': y_pred_proba,
+                    'metrics': metrics,
+                    'business_metrics': business_metrics,
+                    'training_time': training_time,
+                    'test_data': (X_test, y_test)
+                }
+                
+                print(f"    ✅ {algorithm} - Accuracy: {metrics['accuracy']:.3f}, "
+                      f"F1: {metrics['f1_score']:.3f} ({training_time:.1f}s)")
             
             if task_results:
                 # Find best model
@@ -780,6 +800,21 @@ class NLPProcessingSystem:
                 print(f"  🏆 Best model for {task_name}: {best_algorithm}")
         
         return all_results
+    
+    def _model_params(self, algorithm: str) -> Dict[str, Any]:
+        """Constructor arguments per algorithm, sized for a quick demonstration."""
+        random_state = self.config['random_state']
+        params = {
+            'random_forest': dict(n_estimators=50, max_depth=12, class_weight='balanced',
+                                  random_state=random_state, n_jobs=-1),
+            'gradient_boosting': dict(n_estimators=50, max_depth=3, learning_rate=0.1,
+                                      random_state=random_state),
+            'logistic_regression': dict(class_weight='balanced', max_iter=500,
+                                        random_state=random_state),
+            'neural_network': dict(hidden_layer_sizes=(64,), max_iter=200,
+                                   random_state=random_state),
+        }
+        return params.get(algorithm, {'random_state': random_state})
     
     def calculate_nlp_impact(self, task_name: str, y_true: pd.Series, 
                            y_pred: pd.Series, X_test: pd.DataFrame) -> Dict[str, float]:
@@ -875,7 +910,20 @@ class NLPProcessingSystem:
         sample_size = min(500, len(X))
         X_sample = X.sample(n=sample_size, random_state=self.config['random_state'])
         
-        for idx, row in X_sample.iterrows():
+        # Predict once per task on the whole sample (numeric features only)
+        X_sample_numeric = X_sample[self.feature_columns_]
+        task_predictions: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
+        for task_name, task_data in models_dict.items():
+            if 'best_performance' in task_data:
+                model = task_data['best_performance']['model']
+                predictions = model.predict(X_sample_numeric)
+                if hasattr(model, 'predict_proba'):
+                    confidences = model.predict_proba(X_sample_numeric).max(axis=1)
+                else:
+                    confidences = np.full(len(X_sample_numeric), 0.8)
+                task_predictions[task_name] = (predictions, confidences)
+        
+        for position, (idx, row) in enumerate(X_sample.iterrows()):
             insight_record = {
                 'document_id': f'DOC_{idx:06d}',
                 'document_type': row['document_type'],
@@ -885,19 +933,10 @@ class NLPProcessingSystem:
                 'quality_score': row['text_quality_score']
             }
             
-            # Predict with available models
-            for task_name, task_data in models_dict.items():
-                if 'best_performance' in task_data:
-                    model = task_data['best_performance']['model']
-                    try:
-                        prediction = model.predict([row])[0]
-                        confidence = model.predict_proba([row])[0].max() if hasattr(model, 'predict_proba') else 0.8
-                        
-                        insight_record[f'{task_name}_prediction'] = prediction
-                        insight_record[f'{task_name}_confidence'] = confidence
-                    except:
-                        insight_record[f'{task_name}_prediction'] = 'unknown'
-                        insight_record[f'{task_name}_confidence'] = 0.5
+            # Attach the per-task predictions
+            for task_name, (predictions, confidences) in task_predictions.items():
+                insight_record[f'{task_name}_prediction'] = predictions[position]
+                insight_record[f'{task_name}_confidence'] = float(confidences[position])
             
             # Processing recommendations
             insight_record['automation_recommended'] = row['automation_feasibility'] > 0.7
@@ -1164,7 +1203,11 @@ Recommendations:
         ax15.set_title('NLP System Summary', fontweight='bold', pad=20)
         
         plt.tight_layout()
-        plt.show()
+        # Headless-friendly: save the figure instead of opening a window.
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(figure_dir / "natural_language_processing.png", dpi=100, bbox_inches="tight")
+        plt.close("all")
         
         print("✅ NLP visualizations completed")
     

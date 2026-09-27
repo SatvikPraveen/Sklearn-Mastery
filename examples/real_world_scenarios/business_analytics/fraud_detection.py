@@ -30,17 +30,25 @@ import warnings
 from datetime import datetime, timedelta
 warnings.filterwarnings('ignore')
 
+# Make the repository root importable so this script can be run directly
+# (``python examples/real_world_scenarios/<domain>/<script>.py``) as well as
+# via ``python -m examples.real_world_scenarios.<domain>.<script>``.
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Framework imports
-from sklearn_mastery.data.generators import DataGenerator
 from sklearn_mastery.data.preprocessors import DataPreprocessor
 from sklearn_mastery.models.supervised.classification import ClassificationModels
 from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
-from ..utilities.data_loaders import DataLoader
-from ..utilities.visualization_helpers import BusinessVisualizer
-from ..utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
+from examples.real_world_scenarios.utilities.data_loaders import DataLoader
+from examples.real_world_scenarios.utilities.visualization_helpers import BusinessVisualizer
+from examples.real_world_scenarios.utilities.evaluation_helpers import BusinessMetricsCalculator, ModelPerformanceEvaluator
 
 class FraudDetectionSystem:
     """Complete fraud detection system pipeline."""
@@ -48,8 +56,8 @@ class FraudDetectionSystem:
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize fraud detection system."""
         
-        self.config = config or {
-            'data_size': 50000,
+        defaults = {
+            'data_size': 20000,
             'test_size': 0.2,
             'random_state': 42,
             'algorithms': ['random_forest', 'gradient_boosting', 'isolation_forest'],
@@ -65,6 +73,8 @@ class FraudDetectionSystem:
                 'max_false_positive_rate': 0.02  # <2% false positives
             }
         }
+        # User-supplied keys override the defaults; missing keys keep them.
+        self.config = {**defaults, **(config or {})}
         
         # Initialize components
         self.data_loader = DataLoader(random_state=self.config['random_state'])
@@ -201,9 +211,9 @@ class FraudDetectionSystem:
             legit_idx = y[y == 0].index
             
             # Sample equal number of legitimate transactions
-            undersampled_legit_idx = np.random.choice(
-                legit_idx, size=len(fraud_idx), replace=False, 
-                random_state=self.config['random_state']
+            rng = np.random.default_rng(self.config['random_state'])
+            undersampled_legit_idx = rng.choice(
+                legit_idx, size=len(fraud_idx), replace=False
             )
             
             balanced_idx = np.concatenate([fraud_idx, undersampled_legit_idx])
@@ -220,18 +230,42 @@ class FraudDetectionSystem:
             print("   No rebalancing applied - will use class weights in models")
             return X, y
     
+    @staticmethod
+    def _score_binary_predictions(y_true: pd.Series, y_pred: np.ndarray,
+                                  scores: np.ndarray = None) -> Dict[str, Any]:
+        """Classification metrics for models without a predict_proba (e.g. Isolation Forest)."""
+        from sklearn.metrics import (accuracy_score, precision_score, recall_score,
+                                     f1_score, roc_auc_score, roc_curve, confusion_matrix)
+        metrics = {
+            'accuracy': accuracy_score(y_true, y_pred),
+            'precision': precision_score(y_true, y_pred, zero_division=0),
+            'recall': recall_score(y_true, y_pred, zero_division=0),
+            'f1': f1_score(y_true, y_pred, zero_division=0),
+            'confusion_matrix': confusion_matrix(y_true, y_pred),
+        }
+        if scores is not None:
+            metrics['auc'] = roc_auc_score(y_true, scores)
+            fpr, tpr, _ = roc_curve(y_true, scores)
+            metrics['roc_data'] = {'fpr': fpr, 'tpr': tpr, 'auc': metrics['auc']}
+        return metrics
+    
     def train_fraud_detection_models(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, Any]:
         """Train specialized fraud detection models."""
         
         print("\n🤖 Training fraud detection models...")
         
-        # Split data
+        # Split data FIRST: the test set must keep the real-world fraud rate
+        # (resampling before splitting would leak synthetic samples into it).
         from sklearn.model_selection import train_test_split
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=self.config['test_size'], 
             random_state=self.config['random_state'], 
             stratify=y
         )
+        real_fraud_rate = float(y_train.mean())
+        
+        # Rebalance the training portion only
+        X_train_bal, y_train_bal = self.handle_class_imbalance(X_train, y_train)
         
         # Initialize models with fraud-specific configurations
         models = ClassificationModels()
@@ -241,36 +275,39 @@ class FraudDetectionSystem:
         
         algorithms_to_test = {
             'Random Forest': models.get_random_forest(
-                n_estimators=200, 
+                n_estimators=50, 
                 class_weight=class_weight,
                 random_state=self.config['random_state']
             ),
             'Gradient Boosting': models.get_gradient_boosting(
-                n_estimators=200,
+                n_estimators=50,
                 learning_rate=0.1,
                 random_state=self.config['random_state']
             ),
             'Logistic Regression': models.get_logistic_regression(
                 class_weight=class_weight,
+                max_iter=2000,
                 random_state=self.config['random_state']
             )
         }
         
-        # Add isolation forest for anomaly detection
+        # Add isolation forest for anomaly detection (unsupervised: it is fitted
+        # on the original, un-resampled training data with the true fraud rate)
         from sklearn.ensemble import IsolationForest
         algorithms_to_test['Isolation Forest'] = IsolationForest(
-            contamination=y_train.mean(),  # Set contamination to fraud rate
+            n_estimators=100,
+            contamination=float(np.clip(real_fraud_rate, 1e-3, 0.5)),
             random_state=self.config['random_state']
         )
         
         # Add XGBoost if available
-        try:
+        if 'xgboost' in ClassificationModels.available_models():
             algorithms_to_test['XGBoost'] = models.get_xgboost(
-                n_estimators=200,
-                scale_pos_weight=len(y_train[y_train==0]) / len(y_train[y_train==1]),
+                n_estimators=50,
+                scale_pos_weight=len(y_train_bal[y_train_bal==0]) / max(len(y_train_bal[y_train_bal==1]), 1),
                 random_state=self.config['random_state']
             )
-        except:
+        else:
             print("   XGBoost not available, skipping...")
         
         # Train and evaluate each model
@@ -279,22 +316,26 @@ class FraudDetectionSystem:
             print(f"   Training {name}...")
             
             if name == 'Isolation Forest':
-                # Isolation Forest works differently
+                # Isolation Forest works differently: unsupervised fit, then
+                # negative anomaly scores are flagged as fraud.
                 model.fit(X_train)
                 y_pred_scores = model.decision_function(X_test)
-                # Convert to binary predictions (negative scores indicate outliers)
                 y_pred = (y_pred_scores < 0).astype(int)
                 y_proba = None
+                performance = self._score_binary_predictions(y_test, y_pred, -y_pred_scores)
             else:
-                # Standard supervised learning
-                model.fit(X_train, y_train)
+                # Standard supervised learning on the rebalanced training data
+                model.fit(X_train_bal, y_train_bal)
                 y_pred = model.predict(X_test)
                 y_proba = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else None
-            
-            # Evaluate performance
-            performance = self.model_evaluator.evaluate_classification_model(
-                model, X_test, y_test, X_train, y_train, cv_folds=3
-            )
+                
+                # Evaluate performance (cross-validation on the rebalanced training set),
+                # then report precision/recall/F1 for the FRAUD class specifically:
+                # weighted averages are dominated by the legitimate majority class.
+                performance = self.model_evaluator.evaluate_classification_model(
+                    model, X_test, y_test, X_train_bal, y_train_bal, cv_folds=3
+                )
+                performance.update(self._score_binary_predictions(y_test, y_pred, y_proba))
             
             # Calculate business impact
             business_impact = self.business_calc.calculate_fraud_business_impact(
@@ -483,13 +524,14 @@ class FraudDetectionSystem:
             }
         }
         
-        # Create dashboard
+        # Create dashboard (headless-friendly: saved to disk, no window opened)
+        figure_dir = REPO_ROOT / "results" / "figures" / "examples"
+        figure_dir.mkdir(parents=True, exist_ok=True)
         fig = self.visualizer.plot_fraud_detection_dashboard(
             viz_data,
-            save_path='fraud_detection_dashboard.png' if save_plots else None
+            save_path=str(figure_dir / "fraud_detection.png") if save_plots else None
         )
-        
-        plt.show()
+        plt.close("all")
         
         print("✅ Fraud detection dashboard created")
     
@@ -505,11 +547,8 @@ class FraudDetectionSystem:
         # 2. Feature engineering
         X_processed, y_processed = self.advanced_feature_engineering(X, y)
         
-        # 3. Handle class imbalance
-        X_balanced, y_balanced = self.handle_class_imbalance(X_processed, y_processed)
-        
-        # 4. Train models
-        model_results = self.train_fraud_detection_models(X_balanced, y_balanced)
+        # 3 + 4. Split, rebalance the training data only, then train models
+        model_results = self.train_fraud_detection_models(X_processed, y_processed)
         
         # 5. Real-time performance testing
         scoring_performance = self.real_time_scoring_simulation()
@@ -548,7 +587,7 @@ def main():
     
     # Configuration for fraud detection
     config = {
-        'data_size': 50000,
+        'data_size': 20000,
         'algorithms': ['random_forest', 'gradient_boosting', 'xgboost'],
         'rebalancing_method': 'smote',
         'business_params': {

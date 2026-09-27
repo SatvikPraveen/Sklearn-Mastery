@@ -226,21 +226,29 @@ class ModelPerformanceEvaluator:
         
         # Predictions
         y_pred = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else None
+        proba_matrix = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
+        n_classes = len(np.unique(y_test))
+        # Binary problems keep the positive-class column; multiclass keeps the full matrix.
+        y_proba = None
+        if proba_matrix is not None:
+            y_proba = proba_matrix[:, 1] if proba_matrix.shape[1] == 2 else proba_matrix
         
         # Basic metrics
         metrics = {
             'accuracy': accuracy_score(y_test, y_pred),
-            'precision': precision_score(y_test, y_pred, average='weighted'),
-            'recall': recall_score(y_test, y_pred, average='weighted'),
-            'f1': f1_score(y_test, y_pred, average='weighted')
+            'precision': precision_score(y_test, y_pred, average='weighted', zero_division=0),
+            'recall': recall_score(y_test, y_pred, average='weighted', zero_division=0),
+            'f1': f1_score(y_test, y_pred, average='weighted', zero_division=0)
         }
         
-        # AUC if probabilities available
+        # AUC if probabilities available (one-vs-rest for multiclass targets)
         if y_proba is not None:
-            metrics['auc'] = roc_auc_score(y_test, y_proba)
-            fpr, tpr, _ = roc_curve(y_test, y_proba)
-            metrics['roc_data'] = {'fpr': fpr, 'tpr': tpr, 'auc': metrics['auc']}
+            if n_classes == 2 and y_proba.ndim == 1:
+                metrics['auc'] = roc_auc_score(y_test, y_proba)
+                fpr, tpr, _ = roc_curve(y_test, y_proba)
+                metrics['roc_data'] = {'fpr': fpr, 'tpr': tpr, 'auc': metrics['auc']}
+            else:
+                metrics['auc'] = roc_auc_score(y_test, y_proba, multi_class='ovr', average='weighted')
         
         # Confusion matrix
         metrics['confusion_matrix'] = confusion_matrix(y_test, y_pred)
