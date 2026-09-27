@@ -105,31 +105,31 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------ derived paths
     @property
-    def RESULTS_DIR(self) -> Path:  # noqa: N802 - keep legacy upper-case API
+    def RESULTS_DIR(self) -> Path:
         return self.PROJECT_ROOT / self.RESULTS_DIRNAME
 
     @property
-    def DATA_DIR(self) -> Path:  # noqa: N802
+    def DATA_DIR(self) -> Path:
         return self.PROJECT_ROOT / "data"
 
     @property
-    def MODELS_DIR(self) -> Path:  # noqa: N802
+    def MODELS_DIR(self) -> Path:
         return self.RESULTS_DIR / "models"
 
     @property
-    def FIGURES_DIR(self) -> Path:  # noqa: N802
+    def FIGURES_DIR(self) -> Path:
         return self.RESULTS_DIR / "figures"
 
     @property
-    def REPORTS_DIR(self) -> Path:  # noqa: N802
+    def REPORTS_DIR(self) -> Path:
         return self.RESULTS_DIR / "reports"
 
     @property
-    def CACHE_DIR(self) -> Path:  # noqa: N802
+    def CACHE_DIR(self) -> Path:
         return self.RESULTS_DIR / "cache"
 
     @property
-    def LOGS_DIR(self) -> Path:  # noqa: N802
+    def LOGS_DIR(self) -> Path:
         return self.PROJECT_ROOT / "logs"
 
     def ensure_directories(self) -> Dict[str, Path]:

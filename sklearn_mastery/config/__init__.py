@@ -1,12 +1,6 @@
 """Configuration package for sklearn-mastery project."""
 
-from .settings import settings, ModelDefaults
-from .logging_config import setup_logging, get_logger, LoggerMixin
+from .logging_config import LoggerMixin, get_logger, setup_logging
+from .settings import ModelDefaults, settings
 
-__all__ = [
-    "settings",
-    "ModelDefaults", 
-    "setup_logging",
-    "get_logger",
-    "LoggerMixin"
-]
+__all__ = ["LoggerMixin", "ModelDefaults", "get_logger", "settings", "setup_logging"]

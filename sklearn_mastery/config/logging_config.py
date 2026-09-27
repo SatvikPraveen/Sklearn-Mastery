@@ -135,7 +135,7 @@ class PerformanceLogger:
         self.start_time: Optional[float] = None
         self.duration: Optional[float] = None
 
-    def __enter__(self) -> "PerformanceLogger":
+    def __enter__(self) -> PerformanceLogger:
         self.start_time = time.perf_counter()
         self.logger.info("Starting %s", self.operation)
         return self
@@ -165,7 +165,9 @@ def log_data_info(logger: logging.Logger, X, y=None, dataset_name: str = "Datase
         logger.info("  Feature dtypes: %s", X.dtypes.value_counts().to_dict())
 
 
-def log_figure_saved(logger: logging.Logger, filepath: Union[str, Path], subfolder: Optional[str] = None) -> None:
+def log_figure_saved(
+    logger: logging.Logger, filepath: Union[str, Path], subfolder: Optional[str] = None
+) -> None:
     """Log that a figure was written to disk."""
     name = Path(filepath).name
     logger.info("Figure saved: %s", f"{subfolder}/{name}" if subfolder else name)
