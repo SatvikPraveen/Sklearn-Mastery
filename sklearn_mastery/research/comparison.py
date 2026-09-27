@@ -228,7 +228,7 @@ def wilcoxon_holm(
     out = pd.DataFrame(rows)
     if out.empty:
         return out
-    out["p_adjusted"] = holm_correction(out["p_value"].to_numpy())
+    out["p_adjusted"] = holm_correction(out["p_value"].tolist())
     out["significant"] = out["p_adjusted"] < alpha
     return out[
         [

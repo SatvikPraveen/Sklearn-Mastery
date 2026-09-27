@@ -101,7 +101,7 @@ class BenchmarkResult:
             return agg
         return agg.reset_index().pivot(index="dataset", columns="estimator", values="mean")
 
-    def score_matrix(self, metric: str, aggregate: str = "mean") -> pd.DataFrame:
+    def score_matrix(self, metric: str, aggregate: Union[str, Callable] = "mean") -> pd.DataFrame:
         """Dataset x estimator matrix of aggregated fold scores for one metric.
 
         This is the input expected by the Friedman/Nemenyi procedures.
@@ -111,7 +111,7 @@ class BenchmarkResult:
             raise KeyError(
                 f"metric {metric!r} not found; available: {sorted(self.results['metric'].unique())}"
             )
-        return df.pivot_table(index="dataset", columns="estimator", values="value", aggfunc=aggregate)
+        return df.pivot_table(index="dataset", columns="estimator", values="value", aggfunc=aggregate)  # type: ignore[arg-type]
 
     def paired_scores(self, metric: str, dataset: str) -> pd.DataFrame:
         """(repeat, fold) x estimator matrix of raw fold scores for one dataset.
