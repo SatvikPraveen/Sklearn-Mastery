@@ -1,30 +1,67 @@
+---
+hide:
+  - toc
+---
+
+<div class="skm-hero" markdown>
+
 # sklearn-mastery
 
-**A research-grade toolkit for reproducible machine-learning experiments with scikit-learn.**
+**Reproducible machine-learning experiments with scikit-learn, from the
+statistics that make a comparison defensible down to the algorithms
+themselves, re-implemented from first principles.**
 
-`sklearn-mastery` turns the usual "train a few models and eyeball the numbers"
-workflow into a defensible experimental protocol. The package provides:
+[Get started](getting_started.md){ .md-button .md-button--primary }
+[Benchmark & compare](research/benchmarking.md){ .md-button }
+[GitHub](https://github.com/SatvikPraveen/Sklearn-Mastery){ .md-button }
 
-- **A benchmark harness** ([`BenchmarkSuite`][sklearn_mastery.research.benchmark.BenchmarkSuite])
-  that evaluates many estimators on many datasets under *identical* repeated
-  stratified splits (so paired tests are valid), with optional nested
-  hyperparameter tuning, tidy long-form results and a hashed provenance
-  manifest for every run.
-- **The statistical procedures the literature recommends** for comparing
-  learning algorithms: Friedman with the Iman-Davenport correction, Nemenyi
-  post-hoc tests and critical-difference diagrams (Demšar, 2006), pairwise
-  Wilcoxon with Holm correction, the Nadeau-Bengio corrected resampled
-  *t*-test, and the Bayesian correlated *t*-test with a region of practical
-  equivalence (Benavoli et al., 2017).
-- **Diagnostics beyond accuracy**: calibration (ECE, MCE, Murphy's Brier
-  decomposition, reliability diagrams) and bootstrap bias-variance
-  decomposition (Domingos, 2000).
-- **Publication-ready tables** in Markdown and LaTeX (mean ± std, best per
-  dataset emphasised, average-rank row).
-- **A consistent, sklearn-compatible model layer** (classification,
-  regression, clustering, dimensionality reduction, ensembles with diversity
-  analysis), **composable preprocessing pipelines**, **deterministic synthetic
-  data generators** and **data validation / drift detection**.
+</div>
+
+<div class="skm-grid" markdown>
+
+<div class="skm-card" markdown>
+### Benchmark harness
+Many estimators × many datasets under *identical* repeated stratified splits,
+optional nested tuning, tidy results and a hashed provenance manifest.
+[BenchmarkSuite →](research/benchmarking.md)
+</div>
+
+<div class="skm-card" markdown>
+### Rigorous comparison
+Friedman + Iman-Davenport, Nemenyi critical-difference diagrams, Wilcoxon-Holm,
+Nadeau-Bengio corrected and Bayesian correlated *t*-tests with a ROPE.
+[Statistical tests →](research/statistical_comparison.md)
+</div>
+
+<div class="skm-card" markdown>
+### Beyond accuracy
+Calibration (ECE, MCE, Brier decomposition, reliability diagrams) and
+bootstrap bias-variance decomposition.
+[Diagnostics →](research/calibration_bias_variance.md)
+</div>
+
+<div class="skm-card" markdown>
+### Algorithms from scratch
+CART, bagging, random forests, AdaBoost, gradient boosting and an XGBoost-style
+booster in plain NumPy, derived in the docstrings and tested against the libraries.
+[From scratch →](from_scratch.md)
+</div>
+
+<div class="skm-card" markdown>
+### Model & pipeline layer
+Uniform sklearn-compatible wrappers, ensembles with diversity analysis,
+composable transformers, feature unions, factories and Bayesian optimisation.
+[Models →](guide/models.md) · [Pipelines →](guide/pipelines.md)
+</div>
+
+<div class="skm-card" markdown>
+### Data & evaluation
+Deterministic synthetic generators, preprocessing, validation and drift
+detection; metrics, analyzers and headless visualisation.
+[Data →](guide/data.md) · [Evaluation →](guide/evaluation.md)
+</div>
+
+</div>
 
 ## Installation
 

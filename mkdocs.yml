@@ -16,20 +16,27 @@ exclude_docs: |
 theme:
   name: material
   language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  font:
+    text: IBM Plex Sans
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Switch to light mode
   features:
     - navigation.tabs
@@ -44,6 +51,10 @@ theme:
     - content.code.annotate
     - content.tabs.link
     - toc.follow
+    - navigation.instant
+    - navigation.tracking
+    - content.tooltips
+    - announce.dismiss
 
 # Narrow logging filter for one known library-docstring warning; see the module docstring.
 hooks:
@@ -99,11 +110,16 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
 
+extra_css:
+  - https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap
+  - stylesheets/extra.css
+
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 extra:
+  generator: false
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/SatvikPraveen/Sklearn-Mastery
