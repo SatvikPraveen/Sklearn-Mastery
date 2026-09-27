@@ -1,0 +1,53 @@
+cff-version: 1.2.0
+message: "If you use sklearn-mastery in your research, please cite it as below."
+title: "sklearn-mastery: a research-grade toolkit for reproducible scikit-learn experiments"
+type: software
+authors:
+  - family-names: Praveen
+    given-names: Satvik
+    email: satvikpraveen707@gmail.com
+version: 2.0.0
+date-released: 2026-09-27
+license: MIT
+repository-code: "https://github.com/SatvikPraveen/Sklearn-Mastery"
+keywords:
+  - scikit-learn
+  - benchmarking
+  - statistical comparison
+  - reproducibility
+  - machine learning
+references:
+  - type: article
+    title: "Statistical comparisons of classifiers over multiple data sets"
+    authors:
+      - family-names: Demšar
+        given-names: Janez
+    journal: "Journal of Machine Learning Research"
+    volume: 7
+    year: 2006
+    start: 1
+    end: 30
+  - type: article
+    title: "Inference for the generalization error"
+    authors:
+      - family-names: Nadeau
+        given-names: Claude
+      - family-names: Bengio
+        given-names: Yoshua
+    journal: "Machine Learning"
+    volume: 52
+    year: 2003
+  - type: article
+    title: "Time for a change: a tutorial for comparing multiple classifiers through Bayesian analysis"
+    authors:
+      - family-names: Benavoli
+        given-names: Alessio
+      - family-names: Corani
+        given-names: Giorgio
+      - family-names: Demšar
+        given-names: Janez
+      - family-names: Zaffalon
+        given-names: Marco
+    journal: "Journal of Machine Learning Research"
+    volume: 18
+    year: 2017
