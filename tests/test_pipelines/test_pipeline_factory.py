@@ -311,6 +311,7 @@ class TestClassificationPipelineFactory:
             n_samples=200,
             n_features=15,
             n_classes=5,
+            n_informative=4,  # sklearn requires n_classes * n_clusters_per_class <= 2**n_informative
             random_state=42
         )
         return pd.DataFrame(X), y
