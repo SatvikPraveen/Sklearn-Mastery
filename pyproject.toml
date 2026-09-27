@@ -71,7 +71,8 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SatvikPraveen/Sklearn-Mastery"
+Homepage = "https://satvikpraveen.github.io/Sklearn-Mastery/"
+Documentation = "https://satvikpraveen.github.io/Sklearn-Mastery/"
 Repository = "https://github.com/SatvikPraveen/Sklearn-Mastery"
 Issues = "https://github.com/SatvikPraveen/Sklearn-Mastery/issues"
 
