@@ -154,7 +154,7 @@ class TestAdvancedFeatureUnion:
             pipelines = []
             
             # Always include numeric processing
-            if any(X.dtypes in ['int64', 'float64']):
+            if any(str(dtype) in ['int64', 'float64'] for dtype in X.dtypes):
                 pipelines.append(('numeric', 'standard_numeric_pipeline'))
             
             # Add categorical processing if needed
@@ -925,7 +925,7 @@ class TestFeatureUnionIntegration:
         ])
         
         # Strategy 2: Feature union with parallel processing
-        numeric_features = [col for col in X.columns if col.startswith('0') or col.startswith('1')]
+        numeric_features = [col for col in X.columns if str(col).startswith('0') or str(col).startswith('1')]
         other_features = [col for col in X.columns if col not in numeric_features]
         
         feature_union = AdvancedFeatureUnion()
