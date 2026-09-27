@@ -115,7 +115,7 @@ ignore = ["E501", "B008", "B905", "RUF012", "UP007", "UP006", "UP035", "UP045", 
 known-first-party = ["sklearn_mastery"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 ignore_missing_imports = true
 warn_unused_ignores = false
 no_implicit_optional = false

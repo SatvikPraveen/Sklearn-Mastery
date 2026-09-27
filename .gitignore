@@ -104,13 +104,13 @@ mlruns/
 mlartifacts/
 
 # Model artifacts
-models/
+/models/
 *.pkl
 *.joblib
 
 # Data files
-data/
-datasets/
+/data/
+/datasets/
 
 # Results and outputs
 results/
