@@ -7,6 +7,17 @@ to [Semantic Versioning](https://semver.org/).
 ## [2.0.0] - 2026-09-27
 
 ### Added
+- `sklearn_mastery.from_scratch`: NumPy-only, sklearn-compatible
+  implementations of CART decision trees (with cost-complexity pruning),
+  bagging, random forests (OOB, permutation importance), AdaBoost SAMME and
+  AdaBoost.R2, gradient boosting (squared/absolute/Huber, binomial and
+  multinomial deviance) and an XGBoost-style second-order booster
+  (regularised gain, missing-value direction, early stopping), each derived
+  in its docstring and tested against the library counterpart.
+- Documentation site (mkdocs-material, custom theme) deployed to GitHub Pages
+  at https://satvikpraveen.github.io/Sklearn-Mastery/ with user guides,
+  methodology pages and a mkdocstrings API reference.
+- Slow test tier that executes every notebook and every example script.
 - `sklearn_mastery.research`: reproducible `BenchmarkSuite` with shared
   repeated stratified splits and optional nested tuning; Friedman /
   Iman-Davenport, Nemenyi, Wilcoxon-Holm, Nadeau-Bengio corrected t-test and
