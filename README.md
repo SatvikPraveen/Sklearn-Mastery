@@ -1,476 +1,192 @@
-# 🚀 Sklearn-Mastery: Comprehensive Scikit-Learn Learning Framework
+# sklearn-mastery
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange.svg)](https://scikit-learn.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 611](https://img.shields.io/badge/tests-611-brightgreen.svg)](tests/)
-[![Test Coverage](https://img.shields.io/badge/coverage-%3E90%25-brightgreen.svg)](#-testing--quality-assurance)
+**A research-grade toolkit for reproducible machine-learning experiments with scikit-learn.**
 
-> **A comprehensive one-stop learning solution for mastering Scikit-Learn: understand data generation, pipeline construction, algorithm implementations, model evaluation, and production-ready patterns.**
+[![CI](https://github.com/SatvikPraveen/Sklearn-Mastery/actions/workflows/ci.yml/badge.svg)](https://github.com/SatvikPraveen/Sklearn-Mastery/actions/workflows/ci.yml)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![scikit-learn 1.3+](https://img.shields.io/badge/scikit--learn-1.3%2B-orange.svg)](https://scikit-learn.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Cite](https://img.shields.io/badge/cite-CITATION.cff-lightgrey.svg)](CITATION.cff)
 
-## 📋 Table of Contents
+`sklearn-mastery` turns the usual "train a few models and eyeball the numbers"
+workflow into a defensible experimental protocol. It provides:
 
-- [🎯 Project Vision](#-project-vision)
-- [🌟 Key Highlights](#-key-highlights)
-- [📁 Project Architecture](#-project-architecture)
-- [🚀 Quick Start Guide](#-quick-start-guide)
-- [🎮 Interactive Notebooks](#-interactive-notebooks)
-- [🎯 Core Features](#-core-features)
-- [🧪 Testing & Quality Assurance](#-testing--quality-assurance)
-- [📚 Documentation & Learning Resources](#-documentation--learning-resources)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-
----
-
-## 🎯 **Project Vision**
-
-This project is a **comprehensive learning resource** for mastering Scikit-Learn through:
-
-🔍 **Complete Framework Understanding** - Learn how to build and structure ML pipelines from data to deployment  
-📊 **Algorithm Deep Dive** - Explore 50+ scikit-learn algorithms across classification, regression, clustering, and dimensionality reduction  
-🔧 **Custom Implementations** - Understand transformer patterns and custom pipeline development  
-📈 **Production Patterns** - Learn evaluation metrics, statistical testing, and deployment best practices  
-🧪 **Hands-On Practice** - 7 interactive notebooks + 611 comprehensive tests for learning validation
-
----
-
-## 🌟 **Key Highlights**
-
-### ✨ **Learning-Focused Framework**
-
-| Component | Description | Key Features |
-|-----------|-------------|--------------|
-| **50+ ML Algorithms** | Supervised, unsupervised, ensemble methods | Classification, regression, clustering, dimensionality reduction |
-| **Custom Transformers** | sklearn-compatible pipeline components | Feature engineering, preprocessing, data validation |
-| **Data Generation** | Algorithm-specific synthetic datasets | Perfect for testing, learning, and validation |
-| **7 Interactive Notebooks** | Hands-on learning from data to deployment | Progressive complexity from basics to advanced |
-| **611 Unit Tests** | Comprehensive test coverage for validation | Learn from test patterns and expected behaviors |
-| **Advanced Evaluation** | Statistical metrics and visualization | Hypothesis testing, learning curves, model interpretation |
-
-### 📚 **What You'll Learn**
-
-```
-✅ Building sklearn pipelines with custom transformers
-✅ Creating synthetic datasets for algorithm testing
-✅ Implementing supervised learning (classification & regression)
-✅ Unsupervised learning (clustering & dimensionality reduction)
-✅ Ensemble methods and meta-learning
-✅ Hyperparameter tuning and model selection
-✅ Statistical evaluation and significance testing
-✅ Production-ready patterns and deployment considerations
-```
+- **A benchmark harness** that evaluates many estimators on many datasets under
+  *identical* repeated stratified splits (so paired tests are valid), with
+  optional nested hyperparameter tuning, tidy long-form results, and a hashed
+  provenance manifest for every run.
+- **The statistical procedures the literature actually recommends** for
+  comparing learning algorithms: Friedman with the Iman–Davenport correction,
+  Nemenyi post-hoc and critical-difference diagrams (Demšar, 2006), pairwise
+  Wilcoxon with Holm correction, the Nadeau–Bengio corrected resampled *t*-test,
+  and the Bayesian correlated *t*-test with a region of practical equivalence
+  (Benavoli et al., 2017).
+- **Diagnostics beyond accuracy**: calibration (ECE, MCE, Murphy's Brier
+  decomposition, reliability diagrams) and bootstrap bias–variance decomposition
+  (Domingos, 2000).
+- **Publication-ready tables** in Markdown and LaTeX (mean ± std, best per
+  dataset emphasised, average-rank row).
+- **A consistent, sklearn-compatible model layer** (classification, regression,
+  clustering, dimensionality reduction, ensembles with diversity analysis),
+  **composable preprocessing pipelines**, **deterministic synthetic data
+  generators**, and **data validation / drift detection**, all covered by an
+  extensive test suite.
 
 ---
 
-## 📁 **Project Architecture**
+## Installation
 
-<details>
-<summary><strong>🏗️ Detailed Project Structure (Click to expand)</strong></summary>
-
-```
-sklearn-mastery/
-├── 📦 src/                          # Core learning framework (~9,900 LoC)
-│   ├── 🔢 data/                     # Data engineering
-│   │   ├── generators.py            # Synthetic data generation (15+ methods)
-│   │   ├── preprocessors.py         # Preprocessing utilities
-│   │   └── validators.py            # Data validation
-│   ├── 🔧 pipelines/                # Pipeline & transformation layer
-│   │   ├── custom_transformers.py   # 20+ sklearn transformers
-│   │   ├── pipeline_factory.py      # Pipeline creation patterns
-│   │   ├── model_selection.py       # Model selection utilities
-│   │   └── feature_union.py         # Feature composition patterns
-│   ├── 🤖 models/                   # Algorithm implementations
-│   │   ├── supervised/              # Classification & regression (30+ models)
-│   │   ├── unsupervised/            # Clustering & dimensionality (25+ models)
-│   │   └── ensemble/                # Ensemble methods (5 types)
-│   ├── 📊 evaluation/               # Model evaluation framework
-│   │   ├── metrics.py               # Evaluation metrics
-│   │   ├── statistical_tests.py     # Hypothesis testing
-│   │   ├── visualization.py         # Results visualization
-│   │   └── utils.py                 # Evaluation utilities
-│   ├── 🔐 preprocessing/            # Preprocessing wrapper
-│   └── 🛠️ utils/                    # Utilities & helpers
-├── 📓 notebooks/                    # 7 Interactive Jupyter notebooks
-│   ├── 01_data_generation_showcase.ipynb
-│   ├── 02_preprocessing_pipelines.ipynb
-│   ├── 03_supervised_learning.ipynb
-│   ├── 04_unsupervised_learning.ipynb
-│   ├── 05_ensemble_methods.ipynb
-│   ├── 06_model_selection_tuning.ipynb
-│   └── 07_advanced_techniques.ipynb
-├── 🧪 tests/                        # 611 comprehensive tests
-│   ├── test_data/
-│   ├── test_models/
-│   ├── test_pipelines/
-│   └── test_utils/
-├── 📚 docs/                         # Documentation
-│   ├── algorithm_guides/            # Algorithm-specific guides
-│   ├── tutorials/                   # Step-by-step tutorials
-│   └── examples/                    # Code examples
-├── ⚙️ config/                       # Configuration management
-├── 📄 setup.py                      # Package installation
-├── 📋 requirements.txt              # Dependencies
-└── 🧪 conftest.py                  # Pytest configuration
+```bash
+git clone https://github.com/SatvikPraveen/Sklearn-Mastery.git
+cd Sklearn-Mastery
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"          # core + test/lint tooling
+# optional extras: boosting (xgboost, lightgbm), tuning (optuna), interpret (shap, lime),
+#                  imbalanced, tracking (mlflow), viz (plotly), notebooks, docs, all
+pip install -e ".[all]"
 ```
 
-</details>
+Requires Python 3.9+ and scikit-learn 1.3+. Heavy optional dependencies are
+imported lazily; every module works without them.
 
 ---
 
-## 🚀 **Quick Start Guide**
-
-### **Prerequisites**
-
-- Python 3.8+ 🐍
-- 8GB+ RAM recommended 💾
-- Git version control 🔧
-
-### **Installation Options**
-
-<details>
-<summary><strong>🔧 Standard Installation</strong></summary>
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/SatvikPraveen/sklearn-mastery.git
-cd sklearn-mastery
-
-# 2. Create virtual environment
-python -m venv sklearn_env
-source sklearn_env/bin/activate  # Windows: sklearn_env\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Install package in development mode
-pip install -e .
-
-# 5. Verify installation
-python -c "import sklearn_mastery; print('✅ Installation successful!')"
-
-# 6. Test with a quick example
-python -c "
-from sklearn_mastery.data.generators import SyntheticDataGenerator
-gen = SyntheticDataGenerator()
-X, y = gen.classification_complexity_spectrum('medium')
-print(f'✅ Generated dataset: {X.shape[0]} samples, {X.shape[1]} features')
-"
-```
-
-</details>
-
-<details>
-<summary><strong>🐳 Docker Installation</strong></summary>
-
-```bash
-# 1. Clone repository
-git clone https://github.com/SatvikPraveen/sklearn-mastery.git
-cd sklearn-mastery
-
-# 2. Build Docker image
-docker build -t sklearn-mastery .
-
-# 3. Run container with Jupyter
-docker run -p 8888:8888 -v $(pwd):/workspace sklearn-mastery
-
-# 4. Access Jupyter at http://localhost:8888
-```
-
-</details>
-
-<details>
-<summary><strong>📦 Conda Installation</strong></summary>
-
-```bash
-# 1. Clone repository
-git clone https://github.com/SatvikPraveen/sklearn-mastery.git
-cd sklearn-mastery
-
-# 2. Create conda environment
-conda create -n sklearn-mastery python=3.9
-conda activate sklearn-mastery
-
-# 3. Install dependencies
-conda install --file requirements.txt
-pip install -e .
-
-# 4. Launch Jupyter
-jupyter notebook
-```
-
-</details>
-
-<details>
-<summary><strong>⚡ Minimal Installation</strong></summary>
-
-```bash
-# For basic functionality only
-pip install -r requirements-minimal.txt
-```
-
-</details>
-
-### **🔥 Why This Project?**
-
-| Aspect | Traditional Learning | **Sklearn-Mastery** |
-|--------|----------------------|---------------------|
-| **Focus** | Theory & concepts | Hands-on sklearn implementation |
-| **Data Generation** | Use static datasets | Create algorithm-specific synthetic data |
-| **Pipeline Building** | Simple sklearn examples | Production-ready patterns + custom transformers |
-| **Model Evaluation** | Basic metrics | Statistical testing + visualization |
-| **Real Examples** | Single use case | Multiple patterns across algorithms |
-| **Learning Path** | Self-directed | Structured notebooks + tests |
-| **Test Coverage** | Rarely present | 611 tests validating behaviors |
-
-### **30-Second Demo**
+## Quick start: a defensible model comparison in 20 lines
 
 ```python
-from sklearn_mastery.data.generators import SyntheticDataGenerator
-from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
-from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn.datasets import load_breast_cancer, load_iris, load_wine, load_digits
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
-# 🎯 Generate algorithm-optimized data
-generator = SyntheticDataGenerator(random_state=42)
-X, y = generator.classification_complexity_spectrum('medium')
-
-# 🔧 Create advanced pipeline with auto-tuning
-factory = PipelineFactory()
-pipeline = factory.create_pipeline_with_auto_tuning(
-    algorithm='random_forest',
-    task_type='classification',
-    preprocessing_level='advanced'
+from sklearn_mastery.research import (
+    BenchmarkSuite, friedman_test, nemenyi_critical_difference,
+    plot_critical_difference_diagram, results_to_markdown, wilcoxon_holm,
 )
 
-# 📊 Train and evaluate
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+suite = BenchmarkSuite(
+    estimators={
+        "logreg": make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)),
+        "svm": make_pipeline(StandardScaler(), SVC()),
+        "rf": RandomForestClassifier(n_estimators=300, random_state=0),
+    },
+    datasets={name: loader(return_X_y=True)
+              for name, loader in [("iris", load_iris), ("wine", load_wine),
+                                   ("cancer", load_breast_cancer), ("digits", load_digits)]},
+    scoring=["accuracy", "f1_macro"], n_splits=5, n_repeats=3, random_state=42, n_jobs=-1,
+)
+result = suite.run()                                  # tidy DataFrame + provenance manifest
+print(results_to_markdown(result.results, "accuracy"))
 
-pipeline.fit(X_train, y_train)
-score = pipeline.score(X_test, y_test)
-print(f"🎉 Model accuracy: {score:.3f}")
+scores = result.score_matrix("accuracy")              # datasets x estimators
+fr = friedman_test(scores)                            # H0: all estimators perform the same
+cd = nemenyi_critical_difference(fr.n_estimators, fr.n_datasets, alpha=0.05)
+print(fr.average_ranks, fr.iman_davenport_p_value, cd)
+print(wilcoxon_holm(scores))                          # pairwise, family-wise error controlled
+plot_critical_difference_diagram(fr.average_ranks, cd).figure.savefig("cd.png")
+result.save("runs/baseline")                          # results.csv + manifest.json + best_params.json
 ```
 
----
-
-## 🎮 **Interactive Notebooks**
-
-Explore the project through **7 comprehensive Jupyter notebooks**:
-
-| Notebook                                                                       | Focus Area                  | Key Features                                                       |
-| ------------------------------------------------------------------------------ | --------------------------- | ------------------------------------------------------------------ |
-| **[01_data_generation_showcase](notebooks/01_data_generation_showcase.ipynb)** | Data Engineering            | 15+ synthetic data generators, visualization, complexity analysis  |
-| **[02_preprocessing_pipelines](notebooks/02_preprocessing_pipelines.ipynb)**   | Data Preprocessing          | Custom transformers, pipeline patterns, strategy comparisons       |
-| **[03_supervised_learning](notebooks/03_supervised_learning.ipynb)**           | Supervised ML               | Classification/regression, hyperparameter tuning, model comparison |
-| **[04_unsupervised_learning](notebooks/04_unsupervised_learning.ipynb)**       | Unsupervised ML             | Clustering, dimensionality reduction, anomaly detection            |
-| **[05_ensemble_methods](notebooks/05_ensemble_methods.ipynb)**                 | Ensemble Learning           | Voting, stacking, blending, diversity analysis                     |
-| **[06_model_selection_tuning](notebooks/06_model_selection_tuning.ipynb)**     | Hyperparameter Optimization | Grid search, random search, Bayesian optimization                  |
-| **[07_advanced_techniques](notebooks/07_advanced_techniques.ipynb)**           | Production ML               | SHAP interpretation, model serialization, deployment               |
-
----
-
-## 🎯 **Core Features**
-
-### 🔧 **Advanced Pipeline System**
-
-<details>
-<summary><strong>Custom Transformers Library</strong></summary>
+Comparing two algorithms on a **single** dataset? Cross-validation folds are
+not independent, so use the corrected tests:
 
 ```python
-from sklearn_mastery.pipelines.custom_transformers import *
+from sklearn_mastery.research import bayesian_correlated_ttest, corrected_resampled_ttest
 
-# 🔍 Intelligent outlier detection
-outlier_remover = OutlierRemover(
-    methods=['isolation_forest', 'lof', 'zscore'],
-    contamination=0.1
-)
-
-# ⚡ Feature interaction creation
-interaction_creator = FeatureInteractionCreator(
-    interaction_types=['polynomial', 'pairwise', 'log_transform'],
-    degree=2
-)
-
-# 🏷️ Domain-specific encoding
-encoder = DomainSpecificEncoder(
-    categorical_strategy='target_encoding',
-    numerical_strategy='quantile_uniform'
-)
-
-# 🔄 Advanced imputation
-imputer = AdvancedImputer(
-    strategy='iterative',
-    estimator='random_forest'
-)
+paired = result.paired_scores("accuracy", "wine")     # (repeat, fold) x estimator
+t, p = corrected_resampled_ttest(paired["rf"], paired["svm"], n_splits=5)
+post = bayesian_correlated_ttest(paired["rf"], paired["svm"], rope=0.01, n_splits=5)
+print(post.p_left, post.p_rope, post.p_right, post.decision())
 ```
 
-</details>
-
-<details>
-<summary><strong>Pipeline Factory Patterns</strong></summary>
-
-```python
-from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
-
-factory = PipelineFactory(random_state=42)
-
-# 🚀 Speed-optimized pipeline
-minimal_pipeline = factory.create_classification_pipeline(
-    algorithm='logistic_regression',
-    preprocessing_level='minimal',  # Basic scaling only
-    n_jobs=-1
-)
-
-# ⚖️ Balanced performance pipeline
-standard_pipeline = factory.create_classification_pipeline(
-    algorithm='random_forest',
-    preprocessing_level='standard',  # Standard preprocessing
-    feature_selection=True,
-    handle_imbalance=False
-)
-
-# 🎯 Maximum performance pipeline
-advanced_pipeline = factory.create_classification_pipeline(
-    algorithm='gradient_boosting',
-    preprocessing_level='advanced',  # Full preprocessing suite
-    feature_selection=True,
-    handle_imbalance=True,  # SMOTE integration
-    feature_engineering=True
-)
-
-# 🏭 Production pipeline with monitoring
-production_pipeline = factory.create_production_pipeline(
-    algorithm='xgboost',
-    enable_monitoring=True,
-    cache_transformations=True,
-    parallel_preprocessing=True
-)
-```
-
-</details>
-
-### 🧠 **Intelligent Data Generation**
-
-<details>
-<summary><strong>Algorithm-Specific Datasets</strong></summary>
-
-```python
-from sklearn_mastery.data.generators import SyntheticDataGenerator
-
-generator = SyntheticDataGenerator(random_state=42)
-
-# 📊 Perfect for Linear/Ridge/Lasso comparison
-X_reg, y_reg, true_coef = generator.regression_with_collinearity(
-    n_samples=1000,
-    collinear_groups=[(0,1,2), (5,6,7,8)],  # Multicollinear features
-    noise_variance=0.1,
-    sparsity=0.3  # Sparse true coefficients
-)
-
-# 🎯 Ideal for SVM vs Neural Network comparison
-X_nonlinear, y_nonlinear = generator.classification_complexity_spectrum('high')
-
-# 🔍 Perfect for clustering algorithm comparison
-X_blobs = generator.clustering_blobs_with_noise(
-    n_clusters=4,
-    outlier_fraction=0.1,
-    cluster_std_range=(0.5, 2.0)
-)
-
-# 📈 High-dimensional sparse data for Naive Bayes
-X_sparse, y_sparse = generator.high_dimensional_sparse_data(
-    n_features=10000,
-    sparsity=0.95,
-    informative_features=100
-)
-
-# ⏰ Time series data for forecasting
-ts_data = generator.time_series_with_seasonality(
-    n_periods=1000,
-    seasonal_periods=[7, 30, 365],  # Weekly, monthly, yearly
-    trend_type='polynomial',
-    noise_level=0.1
-)
-```
-
-</details>
-
-### 📊 **Comprehensive Evaluation Framework**
-
----
-
-## 📚 **Documentation & Learning Resources**
-
-### **Available Resources**
-
-- 📖 **Algorithm Guides** - `docs/algorithm_guides/` - Deep dives into classification, regression, clustering, dimensionality reduction, and ensemble methods
-- 🎓 **Tutorials** - `docs/tutorials/` - Step-by-step learning paths for getting started and model selection
-- 📊 **Interactive Notebooks** - `notebooks/` - 7 hands-on Jupyter notebooks progressing from basics to advanced techniques
-- 💻 **Examples** - `src/` - Production-ready code patterns and implementations
-
-### **Learning Path**
-
-**Beginner → Intermediate → Advanced**
-
-1. **Start Here**: `notebooks/01_data_generation_showcase.ipynb` - Understand synthetic data
-2. **Preprocessing**: `notebooks/02_preprocessing_pipelines.ipynb` - Build sklearn pipelines
-3. **Supervised Learning**: `notebooks/03_supervised_learning.ipynb` - Classification and regression
-4. **Unsupervised Learning**: `notebooks/04_unsupervised_learning.ipynb` - Clustering and dimensionality reduction
-5. **Ensembles**: `notebooks/05_ensemble_methods.ipynb` - Combine multiple models
-6. **Tuning**: `notebooks/06_model_selection_tuning.ipynb` - Hyperparameter optimization
-7. **Advanced**: `notebooks/07_advanced_techniques.ipynb` - Production patterns and deployment
-
----
-
----
-
-## 🤝 **Contributing**
-
-We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute improvements, bug fixes, and new features.
-
-### **Quick Start for Contributors**
+The same workflow is available from the shell:
 
 ```bash
-# Clone the repository
-git clone https://github.com/SatvikPraveen/sklearn-mastery.git
-cd sklearn-mastery
-
-# Create development environment
-python -m venv venv
-source venv/bin/activate
-
-# Install in development mode
-pip install -e ".[dev]"
-
-# Run tests
-pytest tests/ -v
-
-# Make your changes, test, and submit a PR
+sklearn-mastery benchmark --dataset iris --dataset wine --dataset breast_cancer -o runs/demo
+sklearn-mastery compare runs/demo --cd-diagram cd.png
+sklearn-mastery generate-data --dataset-type classification --complexity high -o data.csv
+sklearn-mastery train data.csv --algorithm gradient_boosting -o runs/gb
+sklearn-mastery info
 ```
 
 ---
 
-## 📄 **License**
+## Package layout
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+```
+sklearn_mastery/
+├── research/          Benchmarking, statistical comparison, calibration, bias-variance,
+│                      reporting, reproducibility (the core of the toolkit)
+├── data/              SyntheticDataGenerator, DataPreprocessor, encoders, DataValidator,
+│                      SchemaValidator, drift detection
+├── models/
+│   ├── supervised/    Classification and regression wrappers with uniform fit/evaluate/tune API
+│   ├── unsupervised/  Clustering (with optimal-k / eps selection) and dimensionality reduction
+│   └── ensemble/      Voting, bagging, boosting, stacking, blending + diversity measures
+├── pipelines/         Custom transformers, feature unions, pipeline factory, model selection
+├── evaluation/        Metrics, statistical tests, cross-validation, analyzers, visualization
+├── config/            Pydantic settings (env-overridable) and library-style logging
+└── cli.py             `sklearn-mastery` command-line interface
+```
+
+Everything is importable from `sklearn_mastery.<subpackage>`; importing the
+package has no side effects (no logging configuration, no directory creation).
+Output paths derive from `settings.PROJECT_ROOT`, which defaults to the current
+working directory and can be overridden with `SKLEARN_MASTERY_ROOT`.
 
 ---
 
-## 🙏 **Acknowledgments**
+## Methodology notes
 
-Special thanks to:
-- 🧠 **Scikit-learn Team** - For the incredible ML library
-- 🌟 **Open Source Community** - For tools and inspiration
-- 🤝 **Contributors** - For improvements and feedback
+| Question | Recommended procedure | Function |
+|---|---|---|
+| Do *k* algorithms differ across *N* datasets? | Friedman test with Iman–Davenport *F* correction | `friedman_test` |
+| Which pairs differ (no designated control)? | Wilcoxon signed-rank + Holm step-down | `wilcoxon_holm` |
+| Visual summary of ranks | Nemenyi critical-difference diagram | `nemenyi_critical_difference`, `plot_critical_difference_diagram` |
+| Two algorithms, one dataset, CV folds | Nadeau–Bengio corrected resampled *t*-test | `corrected_resampled_ttest` |
+| Same, but with practical-equivalence reasoning | Bayesian correlated *t*-test with ROPE | `bayesian_correlated_ttest` |
+| Are probabilities trustworthy? | ECE / MCE, Brier decomposition, reliability diagram | `expected_calibration_error`, `brier_score_decomposition`, `reliability_diagram` |
+| Where does the error come from? | Bootstrap bias–variance decomposition | `bias_variance_decomposition` |
+| Tuned performance without selection bias | Nested CV (`param_grids=` in `BenchmarkSuite`) | `BenchmarkSuite` |
+
+References: Demšar (2006) *JMLR* 7; Nadeau & Bengio (2003) *Machine Learning*
+52; Corani & Benavoli (2015) *Machine Learning* 100; Benavoli et al. (2017)
+*JMLR* 18; Cawley & Talbot (2010) *JMLR* 11; Domingos (2000) *ICML*; Guo et al.
+(2017) *ICML*. Full citations are in the module docstrings and `CITATION.cff`.
 
 ---
 
-<div align="center">
+## Development
 
-**⭐ Star this repository if you find it helpful!**
+```bash
+make install-dev     # editable install + pre-commit hooks
+make test            # pytest with coverage (parallel)
+make lint            # ruff check + format check
+make type-check      # mypy on typed subpackages
+make check           # everything CI runs
+```
 
-**🤖 Happy Machine Learning! 📊**
+Continuous integration runs linting, type checks, the test matrix (Python
+3.10–3.12 on Linux, 3.12 on macOS) and a distribution build on every push and
+pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[CHANGELOG.md](CHANGELOG.md).
 
-_Built with ❤️ by [Satvik Praveen](https://github.com/SatvikPraveen) and the community._
+## Notebooks and examples
 
-</div>
+`notebooks/` walks through data generation, preprocessing, supervised and
+unsupervised learning, ensembles, model selection and advanced techniques.
+`examples/real_world_scenarios/` contains domain scripts (finance, healthcare,
+manufacturing, marketing, technology) built on the model and evaluation layers.
+
+## Citing
+
+If this toolkit contributes to your research, please cite it using the metadata
+in [`CITATION.cff`](CITATION.cff) (GitHub renders a "Cite this repository"
+button from it).
+
+## License
+
+MIT © Satvik Praveen
