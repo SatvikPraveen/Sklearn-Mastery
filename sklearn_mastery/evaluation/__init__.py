@@ -1,20 +1,38 @@
-"""Evaluation package for sklearn-mastery project."""
+"""Model evaluation: metrics, cross-validation, diagnostics and statistical tests."""
 
-from .metrics import ModelEvaluator
-from .statistical_tests import StatisticalTester, ValidationCurveAnalyzer  
-from .visualization import ModelVisualizationSuite
+from sklearn_mastery.evaluation.analyzers import (
+    CalibrationAnalyzer,
+    ConfusionMatrixAnalyzer,
+    FeatureImportanceAnalyzer,
+    PrecisionRecallAnalyzer,
+    ResidualAnalyzer,
+    ROCAnalyzer,
+)
+from sklearn_mastery.evaluation.comparison import PerformanceComparator
+from sklearn_mastery.evaluation.cross_validation import (
+    CrossValidator,
+    LearningCurveAnalyzer,
+    ValidationCurveAnalyzer,
+)
+from sklearn_mastery.evaluation.metrics import MetricsCalculator, ModelEvaluator
+from sklearn_mastery.evaluation.statistical_tests import StatisticalTester
+from sklearn_mastery.evaluation.visualization import ModelVisualizationSuite
 
 __all__ = [
-    'ModelEvaluator',
-    'StatisticalTester', 
-    'ValidationCurveAnalyzer',
-    'ModelVisualizationSuite'
+    "CalibrationAnalyzer",
+    "ConfusionMatrixAnalyzer",
+    "CrossValidator",
+    "FeatureImportanceAnalyzer",
+    "LearningCurveAnalyzer",
+    "MetricsCalculator",
+    "ModelEvaluator",
+    "ModelVisualizationSuite",
+    "PerformanceComparator",
+    "PrecisionRecallAnalyzer",
+    "ROCAnalyzer",
+    "ResidualAnalyzer",
+    "StatisticalTester",
+    "ValidationCurveAnalyzer",
 ]
 
-# Version information
-__version__ = '1.0.0'
-
-# Backward compatibility - maintain existing imports
-# This ensures existing code continues to work
-from .statistical_tests import StatisticalTester as StatisticalTester
-from .statistical_tests import ValidationCurveAnalyzer as ValidationCurveAnalyzer
+__version__ = "2.0.0"

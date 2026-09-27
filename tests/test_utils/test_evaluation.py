@@ -16,10 +16,20 @@ import os
 # Add src to path
 
 from sklearn_mastery.evaluation import (
+    CalibrationAnalyzer,
+    ConfusionMatrixAnalyzer,
+    CrossValidator,
+    FeatureImportanceAnalyzer,
+    LearningCurveAnalyzer,
+    MetricsCalculator,
     ModelEvaluator,
+    ModelVisualizationSuite,
+    PerformanceComparator,
+    PrecisionRecallAnalyzer,
+    ResidualAnalyzer,
+    ROCAnalyzer,
     StatisticalTester,
     ValidationCurveAnalyzer,
-    ModelVisualizationSuite
 )
 
 
@@ -327,7 +337,8 @@ class TestPerformanceComparator:
     
     def test_statistical_comparison(self, sample_data):
         """Test statistical significance testing."""
-        X, y = sample_data[:2]  # Use full dataset
+        X_train, X_test, y_train, y_test = sample_data
+        X, y = np.vstack([X_train, X_test]), np.concatenate([y_train, y_test])  # Use full dataset
         
         models = {
             'rf': RandomForestClassifier(n_estimators=10, random_state=42),
@@ -629,6 +640,7 @@ class TestConfusionMatrixAnalyzer:
             n_samples=200,
             n_features=10,
             n_classes=3,
+            n_informative=4,
             random_state=42
         )
         return train_test_split(X, y, test_size=0.3, random_state=42)
@@ -851,6 +863,7 @@ class TestPrecisionRecallAnalyzer:
             n_samples=200,
             n_features=10,
             n_classes=3,
+            n_informative=4,
             random_state=42
         )
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
@@ -1392,6 +1405,7 @@ class TestAnalyzerBenchmarks:
             n_samples=5000,
             n_features=20,
             n_classes=3,
+            n_informative=4,
             random_state=42
         )
         
