@@ -109,316 +109,6 @@ class TestKMeansModel:
         predictions = model.predict(X)
         
         assert len(predictions) == len(y)
-        # Number of clusters is determined automatically
-        assert len(set(predictions)) >= 1
-    
-    def test_cluster_centers(self, model, data):
-        """Test cluster centers extraction."""
-        X, y = data
-        model.fit(X)
-        
-        centers = model.get_cluster_centers()
-        
-        assert centers.shape[1] == X.shape[1]
-        assert centers.shape[0] >= 1
-
-
-class TestBirchModel:
-    """Test BirchModel class."""
-    
-    @pytest.fixture
-    def model(self):
-        """Create model instance."""
-        return BirchModel(n_clusters=3)
-    
-    @pytest.fixture
-    def data(self):
-        """Generate test data."""
-        X, y = make_blobs(
-            n_samples=100,
-            centers=3,
-            n_features=5,
-            random_state=42
-        )
-        return X, y
-    
-    def test_initialization(self, model):
-        """Test model initialization."""
-        assert model.n_clusters == 3
-        assert hasattr(model, 'model')
-    
-    def test_fit_predict(self, model, data):
-        """Test fitting and prediction."""
-        X, y = data
-        
-        model.fit(X)
-        predictions = model.predict(X)
-        
-        assert len(predictions) == len(y)
-        assert len(set(predictions)) <= model.n_clusters
-    
-    def test_transform(self, model, data):
-        """Test feature transformation."""
-        X, y = data
-        model.fit(X)
-        
-        X_transformed = model.transform(X)
-        
-        assert X_transformed.shape[0] == X.shape[0]
-        # Transformed features should be <= original features
-        assert X_transformed.shape[1] <= X.shape[1]
-
-
-class TestMiniBatchKMeansModel:
-    """Test MiniBatchKMeansModel class."""
-    
-    @pytest.fixture
-    def model(self):
-        """Create model instance."""
-        return MiniBatchKMeansModel(n_clusters=3, random_state=42, batch_size=20)
-    
-    @pytest.fixture
-    def data(self):
-        """Generate test data."""
-        X, y = make_blobs(
-            n_samples=200,
-            centers=3,
-            n_features=5,
-            random_state=42
-        )
-        return X, y
-    
-    def test_initialization(self, model):
-        """Test model initialization."""
-        assert model.n_clusters == 3
-        assert model.random_state == 42
-        assert model.batch_size == 20
-        assert hasattr(model, 'model')
-    
-    def test_fit_predict(self, model, data):
-        """Test fitting and prediction."""
-        X, y = data
-        
-        model.fit(X)
-        predictions = model.predict(X)
-        
-        assert len(predictions) == len(y)
-        assert len(set(predictions)) <= model.n_clusters
-    
-    def test_partial_fit(self, model, data):
-        """Test partial fitting capability."""
-        X, y = data
-        
-        # Split data into batches
-        batch_size = 50
-        for i in range(0, len(X), batch_size):
-            X_batch = X[i:i+batch_size]
-            model.partial_fit(X_batch)
-        
-        predictions = model.predict(X)
-        
-        assert len(predictions) == len(y)
-        assert len(set(predictions)) <= model.n_clusters
-
-
-class TestOPTICSModel:
-    """Test OPTICSModel class."""
-    
-    @pytest.fixture
-    def model(self):
-        """Create model instance."""
-        return OPTICSModel(min_samples=5)
-    
-    @pytest.fixture
-    def data(self):
-        """Generate test data."""
-        X, y = make_blobs(
-            n_samples=100,
-            centers=3,
-            n_features=5,
-            cluster_std=0.8,
-            random_state=42
-        )
-        return X, y
-    
-    def test_initialization(self, model):
-        """Test model initialization."""
-        assert model.min_samples == 5
-        assert hasattr(model, 'model')
-    
-    def test_fit_predict(self, model, data):
-        """Test fitting and prediction."""
-        X, y = data
-        
-        model.fit(X)
-        predictions = model.predict(X)
-        
-        assert len(predictions) == len(y)
-        # OPTICS can predict -1 for noise points
-        assert all(pred >= -1 for pred in predictions)
-    
-    def test_reachability(self, model, data):
-        """Test reachability distances."""
-        X, y = data
-        model.fit(X)
-        
-        reachability = model.get_reachability()
-        
-        assert len(reachability) == len(X)
-        assert np.all(reachability >= 0)
-    
-    def test_ordering(self, model, data):
-        """Test cluster ordering."""
-        X, y = data
-        model.fit(X)
-        
-        ordering = model.get_ordering()
-        
-        assert len(ordering) == len(X)
-        assert set(ordering) == set(range(len(X)))
-
-
-class TestClusteringModelIntegration:
-    """Integration tests for clustering models."""
-    
-    @pytest.fixture
-    def models(self):
-        """Create all model instances."""
-        return {
-            'kmeans': KMeansModel(n_clusters=3, random_state=42),
-            'hierarchical': HierarchicalClusteringModel(n_clusters=3),
-            'dbscan': DBSCANModel(eps=1.0, min_samples=5),
-            'gmm': GaussianMixtureModel(n_components=3, random_state=42),
-            'spectral': SpectralClusteringModel(n_clusters=3, random_state=42),
-            'birch': BirchModel(n_clusters=3),
-            'mini_kmeans': MiniBatchKMeansModel(n_clusters=3, random_state=42)
-        }
-    
-    @pytest.fixture
-    def data(self):
-        """Generate test data."""
-        X, y = make_blobs(
-            n_samples=150,
-            centers=3,
-            n_features=5,
-            cluster_std=1.0,
-            random_state=42
-        )
-        return X, y
-    
-    def test_all_models_fit_predict(self, models, data):
-        """Test that all models can fit and predict."""
-        X, y = data
-        
-        for name, model in models.items():
-            model.fit(X)
-            predictions = model.predict(X)
-            
-            assert len(predictions) == len(y), f"{name} failed prediction length test"
-            assert len(set(predictions)) >= 1, f"{name} should find at least one cluster"
-    
-    def test_clustering_quality(self, models, data):
-        """Test clustering quality with silhouette score."""
-        X, y = data
-        
-        for name, model in models.items():
-            model.fit(X)
-            predictions = model.predict(X)
-            
-            # Skip if only one cluster or noise points only
-            unique_labels = set(predictions)
-            if len(unique_labels) <= 1 or (len(unique_labels) == 2 and -1 in unique_labels):
-                continue
-            
-            # Calculate silhouette score
-            score = silhouette_score(X, predictions)
-            
-            # Should be reasonable (> -0.5 for most cases)
-            assert score > -0.5, f"{name} silhouette score too low: {score}"
-    
-    def test_different_data_shapes(self, models):
-        """Test models with different data shapes."""
-        # Small dataset
-        X_small, _ = make_blobs(n_samples=30, centers=2, n_features=3, random_state=42)
-        
-        # High-dimensional dataset
-        X_high_dim, _ = make_blobs(n_samples=100, centers=3, n_features=20, random_state=42)
-        
-        test_datasets = [
-            ("small", X_small),
-            ("high_dim", X_high_dim)
-        ]
-        
-        for data_name, X in test_datasets:
-            for model_name, model in models.items():
-                # Skip computationally expensive combinations
-                if data_name == "high_dim" and model_name in ["hierarchical", "spectral"]:
-                    continue
-                
-                try:
-                    model.fit(X)
-                    predictions = model.predict(X)
-                    assert len(predictions) == len(X), f"{model_name} failed on {data_name} data"
-                except Exception as e:
-                    pytest.fail(f"{model_name} failed on {data_name} data: {str(e)}")
-    
-    def test_reproducibility(self, data):
-        """Test that models with random_state are reproducible."""
-        X, y = data
-        
-        reproducible_models = [
-            ('kmeans1', KMeansModel(n_clusters=3, random_state=42)),
-            ('kmeans2', KMeansModel(n_clusters=3, random_state=42)),
-            ('gmm1', GaussianMixtureModel(n_components=3, random_state=42)),
-            ('gmm2', GaussianMixtureModel(n_components=3, random_state=42))
-        ]
-        
-        # Test pairs of identical models
-        for i in range(0, len(reproducible_models), 2):
-            name1, model1 = reproducible_models[i]
-            name2, model2 = reproducible_models[i + 1]
-            
-            model1.fit(X)
-            model2.fit(X)
-            
-            pred1 = model1.predict(X)
-            pred2 = model2.predict(X)
-            
-            # Results should be identical for same random state
-            np.testing.assert_array_equal(
-                pred1, pred2,
-                f"Models {name1} and {name2} should produce identical results"
-            )
-    
-    def test_parameter_sensitivity(self, data):
-        """Test sensitivity to different parameters."""
-        X, y = data
-        
-        # Test K-means with different cluster numbers
-        k_values = [2, 3, 4, 5]
-        inertias = []
-        
-        for k in k_values:
-            model = KMeansModel(n_clusters=k, random_state=42)
-            model.fit(X)
-            inertias.append(model.get_inertia())
-        
-        # Inertia should generally decrease with more clusters
-        assert inertias[0] >= inertias[-1], "Inertia should decrease with more clusters"
-        
-        # Test DBSCAN with different eps values
-        eps_values = [0.5, 1.0, 2.0]
-        n_clusters = []
-        
-        for eps in eps_values:
-            model = DBSCANModel(eps=eps, min_samples=5)
-            model.fit(X)
-            predictions = model.predict(X)
-            unique_clusters = len(set(predictions) - {-1})  # Exclude noise label
-            n_clusters.append(unique_clusters)
-        
-        # Should find some clusters
-        assert max(n_clusters) > 0, "DBSCAN should find at least some clusters" == len(y)
         assert len(set(predictions)) <= model.n_clusters
         assert all(0 <= pred < model.n_clusters for pred in predictions)
     
@@ -779,4 +469,314 @@ class TestMeanShiftModel:
         model.fit(X)
         predictions = model.predict(X)
         
-        assert len(predictions)
+        assert len(predictions) == len(y)
+        # Number of clusters is determined automatically
+        assert len(set(predictions)) >= 1
+    
+    def test_cluster_centers(self, model, data):
+        """Test cluster centers extraction."""
+        X, y = data
+        model.fit(X)
+        
+        centers = model.get_cluster_centers()
+        
+        assert centers.shape[1] == X.shape[1]
+        assert centers.shape[0] >= 1
+
+
+class TestBirchModel:
+    """Test BirchModel class."""
+    
+    @pytest.fixture
+    def model(self):
+        """Create model instance."""
+        return BirchModel(n_clusters=3)
+    
+    @pytest.fixture
+    def data(self):
+        """Generate test data."""
+        X, y = make_blobs(
+            n_samples=100,
+            centers=3,
+            n_features=5,
+            random_state=42
+        )
+        return X, y
+    
+    def test_initialization(self, model):
+        """Test model initialization."""
+        assert model.n_clusters == 3
+        assert hasattr(model, 'model')
+    
+    def test_fit_predict(self, model, data):
+        """Test fitting and prediction."""
+        X, y = data
+        
+        model.fit(X)
+        predictions = model.predict(X)
+        
+        assert len(predictions) == len(y)
+        assert len(set(predictions)) <= model.n_clusters
+    
+    def test_transform(self, model, data):
+        """Test feature transformation."""
+        X, y = data
+        model.fit(X)
+        
+        X_transformed = model.transform(X)
+        
+        assert X_transformed.shape[0] == X.shape[0]
+        # Transformed features should be <= original features
+        assert X_transformed.shape[1] <= X.shape[1]
+
+
+class TestMiniBatchKMeansModel:
+    """Test MiniBatchKMeansModel class."""
+    
+    @pytest.fixture
+    def model(self):
+        """Create model instance."""
+        return MiniBatchKMeansModel(n_clusters=3, random_state=42, batch_size=20)
+    
+    @pytest.fixture
+    def data(self):
+        """Generate test data."""
+        X, y = make_blobs(
+            n_samples=200,
+            centers=3,
+            n_features=5,
+            random_state=42
+        )
+        return X, y
+    
+    def test_initialization(self, model):
+        """Test model initialization."""
+        assert model.n_clusters == 3
+        assert model.random_state == 42
+        assert model.batch_size == 20
+        assert hasattr(model, 'model')
+    
+    def test_fit_predict(self, model, data):
+        """Test fitting and prediction."""
+        X, y = data
+        
+        model.fit(X)
+        predictions = model.predict(X)
+        
+        assert len(predictions) == len(y)
+        assert len(set(predictions)) <= model.n_clusters
+    
+    def test_partial_fit(self, model, data):
+        """Test partial fitting capability."""
+        X, y = data
+        
+        # Split data into batches
+        batch_size = 50
+        for i in range(0, len(X), batch_size):
+            X_batch = X[i:i+batch_size]
+            model.partial_fit(X_batch)
+        
+        predictions = model.predict(X)
+        
+        assert len(predictions) == len(y)
+        assert len(set(predictions)) <= model.n_clusters
+
+
+class TestOPTICSModel:
+    """Test OPTICSModel class."""
+    
+    @pytest.fixture
+    def model(self):
+        """Create model instance."""
+        return OPTICSModel(min_samples=5)
+    
+    @pytest.fixture
+    def data(self):
+        """Generate test data."""
+        X, y = make_blobs(
+            n_samples=100,
+            centers=3,
+            n_features=5,
+            cluster_std=0.8,
+            random_state=42
+        )
+        return X, y
+    
+    def test_initialization(self, model):
+        """Test model initialization."""
+        assert model.min_samples == 5
+        assert hasattr(model, 'model')
+    
+    def test_fit_predict(self, model, data):
+        """Test fitting and prediction."""
+        X, y = data
+        
+        model.fit(X)
+        predictions = model.predict(X)
+        
+        assert len(predictions) == len(y)
+        # OPTICS can predict -1 for noise points
+        assert all(pred >= -1 for pred in predictions)
+    
+    def test_reachability(self, model, data):
+        """Test reachability distances."""
+        X, y = data
+        model.fit(X)
+        
+        reachability = model.get_reachability()
+        
+        assert len(reachability) == len(X)
+        assert np.all(reachability >= 0)
+    
+    def test_ordering(self, model, data):
+        """Test cluster ordering."""
+        X, y = data
+        model.fit(X)
+        
+        ordering = model.get_ordering()
+        
+        assert len(ordering) == len(X)
+        assert set(ordering) == set(range(len(X)))
+
+
+class TestClusteringModelIntegration:
+    """Integration tests for clustering models."""
+    
+    @pytest.fixture
+    def models(self):
+        """Create all model instances."""
+        return {
+            'kmeans': KMeansModel(n_clusters=3, random_state=42),
+            'hierarchical': HierarchicalClusteringModel(n_clusters=3),
+            'dbscan': DBSCANModel(eps=1.0, min_samples=5),
+            'gmm': GaussianMixtureModel(n_components=3, random_state=42),
+            'spectral': SpectralClusteringModel(n_clusters=3, random_state=42),
+            'birch': BirchModel(n_clusters=3),
+            'mini_kmeans': MiniBatchKMeansModel(n_clusters=3, random_state=42)
+        }
+    
+    @pytest.fixture
+    def data(self):
+        """Generate test data."""
+        X, y = make_blobs(
+            n_samples=150,
+            centers=3,
+            n_features=5,
+            cluster_std=1.0,
+            random_state=42
+        )
+        return X, y
+    
+    def test_all_models_fit_predict(self, models, data):
+        """Test that all models can fit and predict."""
+        X, y = data
+        
+        for name, model in models.items():
+            model.fit(X)
+            predictions = model.predict(X)
+            
+            assert len(predictions) == len(y), f"{name} failed prediction length test"
+            assert len(set(predictions)) >= 1, f"{name} should find at least one cluster"
+    
+    def test_clustering_quality(self, models, data):
+        """Test clustering quality with silhouette score."""
+        X, y = data
+        
+        for name, model in models.items():
+            model.fit(X)
+            predictions = model.predict(X)
+            
+            # Skip if only one cluster or noise points only
+            unique_labels = set(predictions)
+            if len(unique_labels) <= 1 or (len(unique_labels) == 2 and -1 in unique_labels):
+                continue
+            
+            # Calculate silhouette score
+            score = silhouette_score(X, predictions)
+            
+            # Should be reasonable (> -0.5 for most cases)
+            assert score > -0.5, f"{name} silhouette score too low: {score}"
+    
+    def test_different_data_shapes(self, models):
+        """Test models with different data shapes."""
+        # Small dataset
+        X_small, _ = make_blobs(n_samples=30, centers=2, n_features=3, random_state=42)
+        
+        # High-dimensional dataset
+        X_high_dim, _ = make_blobs(n_samples=100, centers=3, n_features=20, random_state=42)
+        
+        test_datasets = [
+            ("small", X_small),
+            ("high_dim", X_high_dim)
+        ]
+        
+        for data_name, X in test_datasets:
+            for model_name, model in models.items():
+                # Skip computationally expensive combinations
+                if data_name == "high_dim" and model_name in ["hierarchical", "spectral"]:
+                    continue
+                
+                try:
+                    model.fit(X)
+                    predictions = model.predict(X)
+                    assert len(predictions) == len(X), f"{model_name} failed on {data_name} data"
+                except Exception as e:
+                    pytest.fail(f"{model_name} failed on {data_name} data: {str(e)}")
+    
+    def test_reproducibility(self, data):
+        """Test that models with random_state are reproducible."""
+        X, y = data
+        
+        reproducible_models = [
+            ('kmeans1', KMeansModel(n_clusters=3, random_state=42)),
+            ('kmeans2', KMeansModel(n_clusters=3, random_state=42)),
+            ('gmm1', GaussianMixtureModel(n_components=3, random_state=42)),
+            ('gmm2', GaussianMixtureModel(n_components=3, random_state=42))
+        ]
+        
+        # Test pairs of identical models
+        for i in range(0, len(reproducible_models), 2):
+            name1, model1 = reproducible_models[i]
+            name2, model2 = reproducible_models[i + 1]
+            
+            model1.fit(X)
+            model2.fit(X)
+            
+            pred1 = model1.predict(X)
+            pred2 = model2.predict(X)
+            
+            # Results should be identical for same random state
+            np.testing.assert_array_equal(
+                pred1, pred2,
+                f"Models {name1} and {name2} should produce identical results"
+            )
+    
+    def test_parameter_sensitivity(self, data):
+        """Test sensitivity to different parameters."""
+        X, y = data
+        
+        # Test K-means with different cluster numbers
+        k_values = [2, 3, 4, 5]
+        inertias = []
+        
+        for k in k_values:
+            model = KMeansModel(n_clusters=k, random_state=42)
+            model.fit(X)
+            inertias.append(model.get_inertia())
+        
+        # Inertia should generally decrease with more clusters
+        assert inertias[0] >= inertias[-1], "Inertia should decrease with more clusters"
+        
+        # Test DBSCAN with different eps values
+        eps_values = [0.5, 1.0, 2.0]
+        n_clusters = []
+        
+        for eps in eps_values:
+            model = DBSCANModel(eps=eps, min_samples=5)
+            model.fit(X)
+            predictions = model.predict(X)
+            unique_clusters = len(set(predictions) - {-1})  # Exclude noise label
+            n_clusters.append(unique_clusters)
+        
+        # Should find some clusters
+        assert max(n_clusters) > 0, "DBSCAN should find at least some clusters"
