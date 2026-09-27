@@ -4,8 +4,13 @@ Unit tests for visualization utilities.
 Tests for data visualization and model visualization functions.
 """
 
+import builtins
+
 import pytest
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")  # headless backend for the whole module
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.datasets import make_classification, make_regression
@@ -18,6 +23,14 @@ import os
 # Add src to path
 
 from sklearn_mastery.evaluation import ModelVisualizationSuite
+from sklearn_mastery.evaluation.visualization import (
+    ComparisonVisualizer,
+    DataVisualizer,
+    FeatureVisualizer,
+    InteractiveVisualizer,
+    ModelVisualizer,
+    PerformanceVisualizer,
+)
 
 
 class TestDataVisualizer:
@@ -32,6 +45,7 @@ class TestDataVisualizer:
             n_features=4,
             n_classes=3,
             n_informative=3,
+            n_redundant=0,
             random_state=42
         )
         feature_names = ['feature_1', 'feature_2', 'feature_3', 'feature_4']
@@ -589,6 +603,7 @@ class TestInteractiveVisualizer:
             n_features=4,
             n_classes=3,
             n_informative=3,
+            n_redundant=0,
             random_state=42
         )
         feature_names = ['feature_1', 'feature_2', 'feature_3', 'feature_4']
@@ -825,14 +840,14 @@ class TestInteractiveVisualizer:
         visualizer = InteractiveVisualizer()
         
         # Mock plotly unavailable
-        original_import = __builtins__.__import__
+        original_import = builtins.__import__
         
         def mock_import(name, *args, **kwargs):
             if name.startswith('plotly'):
                 raise ImportError("Plotly not available")
             return original_import(name, *args, **kwargs)
         
-        __builtins__.__import__ = mock_import
+        builtins.__import__ = mock_import
         
         try:
             # Should fallback to matplotlib or return None
@@ -846,7 +861,7 @@ class TestInteractiveVisualizer:
             assert fig is None or hasattr(fig, 'show')
             
         finally:
-            __builtins__.__import__ = original_import
+            builtins.__import__ = original_import
     
     def test_widget_integration(self):
         """Test integration with Jupyter widgets if available."""
@@ -946,7 +961,7 @@ class TestVisualizationUtilities:
         
         params = setup_plot_style(figsize=(12, 8))
         
-        assert params['figure.figsize'] == (12, 8)
+        assert tuple(params['figure.figsize']) == (12, 8)
         
         # Reset to original
         plt.rcParams['figure.figsize'] = original_figsize
@@ -1248,7 +1263,7 @@ class TestInteractiveVisualizationAdvanced:
     def test_real_time_model_monitoring(self):
         """Test real-time model monitoring dashboard."""
         # Mock streaming performance data
-        timestamps = pd.date_range('2024-01-01', periods=100, freq='H')
+        timestamps = pd.date_range('2024-01-01', periods=100, freq='h')
         performance_data = {
             'timestamp': timestamps,
             'accuracy': np.random.uniform(0.8, 0.95, 100),
@@ -1270,7 +1285,7 @@ class TestInteractiveVisualizationIntegration:
     @pytest.fixture
     def ml_pipeline_results(self):
         """Create complete ML pipeline results for interactive testing."""
-        X, y = make_classification(n_samples=500, n_features=10, n_classes=3, random_state=42)
+        X, y = make_classification(n_samples=500, n_features=10, n_classes=3, n_informative=5, random_state=42)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
         
         # Train multiple models
