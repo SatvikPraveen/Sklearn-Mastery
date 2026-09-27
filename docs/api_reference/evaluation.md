@@ -13,7 +13,7 @@ Complete API documentation for model evaluation, metrics, statistical tests, and
 Core class for comprehensive model evaluation across different ML tasks.
 
 ```python
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 evaluator = ModelEvaluator()
 ```
@@ -128,7 +128,7 @@ metrics = evaluator.evaluate_clustering_model(
 Specialized classification metrics calculator.
 
 ```python
-from src.evaluation.metrics import ClassificationMetrics
+from sklearn_mastery.evaluation.metrics import ClassificationMetrics
 
 clf_metrics = ClassificationMetrics()
 ```
@@ -217,7 +217,7 @@ report = clf_metrics.classification_report(
 Specialized regression metrics calculator.
 
 ```python
-from src.evaluation.metrics import RegressionMetrics
+from sklearn_mastery.evaluation.metrics import RegressionMetrics
 
 reg_metrics = RegressionMetrics()
 ```
@@ -306,7 +306,7 @@ all_metrics = reg_metrics.regression_metrics_summary(
 Specialized clustering evaluation metrics.
 
 ```python
-from src.evaluation.metrics import ClusteringMetrics
+from sklearn_mastery.evaluation.metrics import ClusteringMetrics
 
 cluster_metrics = ClusteringMetrics()
 ```
@@ -381,7 +381,7 @@ all_metrics = cluster_metrics.clustering_metrics_summary(
 Perform statistical significance tests for model comparison.
 
 ```python
-from src.evaluation.statistical_tests import StatisticalTester
+from sklearn_mastery.evaluation.statistical_tests import StatisticalTester
 
 tester = StatisticalTester()
 ```
@@ -469,7 +469,7 @@ ci_lower, ci_upper = tester.bootstrap_confidence_interval(
 Create evaluation plots and visualizations.
 
 ```python
-from src.evaluation.visualization import EvaluationVisualizer
+from sklearn_mastery.evaluation.visualization import EvaluationVisualizer
 
 visualizer = EvaluationVisualizer(figsize=(10, 8), style='seaborn')
 ```
@@ -597,7 +597,7 @@ fig, ax = visualizer.plot_clustering_results(
 Utility functions for evaluation tasks.
 
 ```python
-from src.evaluation.utils import EvaluationUtils
+from sklearn_mastery.evaluation.utils import EvaluationUtils
 
 utils = EvaluationUtils()
 ```
@@ -679,7 +679,7 @@ report = utils.generate_evaluation_report(
 ### Model Calibration
 
 ```python
-from src.evaluation.calibration import CalibrationEvaluator
+from sklearn_mastery.evaluation.calibration import CalibrationEvaluator
 
 cal_evaluator = CalibrationEvaluator()
 
@@ -708,7 +708,7 @@ calibrated_proba = cal_evaluator.calibrate_probabilities(
 ### Fairness Evaluation
 
 ```python
-from src.evaluation.fairness import FairnessEvaluator
+from sklearn_mastery.evaluation.fairness import FairnessEvaluator
 
 fairness_eval = FairnessEvaluator()
 
@@ -732,7 +732,7 @@ eq_odds_metrics = fairness_eval.evaluate_equalized_odds(
 ### Interpretability Analysis
 
 ```python
-from src.evaluation.interpretability import InterpretabilityAnalyzer
+from sklearn_mastery.evaluation.interpretability import InterpretabilityAnalyzer
 
 interp_analyzer = InterpretabilityAnalyzer()
 
@@ -763,9 +763,9 @@ interp_analyzer.plot_partial_dependence(
 ### Complete Model Evaluation
 
 ```python
-from src.evaluation.metrics import ModelEvaluator
-from src.evaluation.visualization import EvaluationVisualizer
-from src.evaluation.statistical_tests import StatisticalTester
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.evaluation.visualization import EvaluationVisualizer
+from sklearn_mastery.evaluation.statistical_tests import StatisticalTester
 
 # Initialize evaluators
 evaluator = ModelEvaluator()

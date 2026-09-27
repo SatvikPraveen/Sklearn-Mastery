@@ -84,7 +84,7 @@ REQUIRED_VERSIONS = {
 1. **Chunked processing**:
 
 ```python
-from src.data.utils import process_in_chunks
+from sklearn_mastery.data.utils import process_in_chunks
 
 def process_large_dataset(filepath, chunk_size=10000):
     results = []
@@ -131,7 +131,7 @@ X_sparse = csr_matrix(X)
 **Diagnostic checklist**:
 
 ```python
-from src.data.validators import DataValidator
+from sklearn_mastery.data.validators import DataValidator
 
 validator = DataValidator()
 
@@ -160,7 +160,7 @@ print(f"High correlation features: {len(validation_report['high_correlation_pair
 
 ```python
 # Check feature importance
-from src.evaluation.utils import analyze_feature_importance
+from sklearn_mastery.evaluation.utils import analyze_feature_importance
 
 importance_analysis = analyze_feature_importance(
     model, X_train, y_train,
@@ -232,7 +232,7 @@ model = GradientBoostingClassifier(
 **Detection**:
 
 ```python
-from src.evaluation.visualization import plot_learning_curve
+from sklearn_mastery.evaluation.visualization import plot_learning_curve
 
 # Plot learning curves to detect overfitting
 plot_learning_curve(
@@ -302,7 +302,7 @@ X_poly = poly.fit_transform(X)
 3. **Ensemble methods**:
 
 ```python
-from src.models.ensemble.methods import EnsembleMethods
+from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 ensemble = EnsembleMethods()
 voting_clf = ensemble.get_voting_classifier([
     ('rf', RandomForestClassifier()),
@@ -333,7 +333,7 @@ scores = cross_val_score(model, X, y, cv=5, n_jobs=-1)
 2. **Feature selection**:
 
 ```python
-from src.pipelines.custom_transformers import FeatureSelector
+from sklearn_mastery.pipelines.custom_transformers import FeatureSelector
 
 # Remove irrelevant features first
 selector = FeatureSelector(method='univariate', k=100)
@@ -592,7 +592,7 @@ predictions = model.predict(X_test)
 
 ```python
 import logging
-from src.config.logging_config import setup_logging
+from sklearn_mastery.config.logging_config import setup_logging
 
 # Enable debug logging
 setup_logging(level=logging.DEBUG)
@@ -646,7 +646,7 @@ stats = monitor.stop()
 
 ```python
 import unittest
-from src.models.supervised.classification import ClassificationModels
+from sklearn_mastery.models.supervised.classification import ClassificationModels
 
 class TestClassificationModels(unittest.TestCase):
     def setUp(self):
@@ -657,7 +657,7 @@ class TestClassificationModels(unittest.TestCase):
         self.assertIsNotNone(rf)
 
     def test_model_fit_predict(self):
-        from src.data.generators import DataGenerator
+        from sklearn_mastery.data.generators import DataGenerator
 
         generator = DataGenerator()
         X, y = generator.generate_classification_data(n_samples=100)
@@ -679,12 +679,12 @@ def test_complete_pipeline():
     """Test entire pipeline from data to predictions."""
 
     # Generate data
-    from src.data.generators import DataGenerator
+    from sklearn_mastery.data.generators import DataGenerator
     generator = DataGenerator()
     X, y = generator.generate_classification_data(n_samples=1000)
 
     # Create pipeline
-    from src.pipelines.pipeline_factory import PipelineFactory
+    from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
     factory = PipelineFactory()
     pipeline = factory.create_classification_pipeline('random_forest')
 

@@ -19,20 +19,20 @@ Complete API documentation for all modules in the Scikit-Learn Mastery Project.
 
 ```python
 # Data generation
-from src.data.generators import ClassificationDataGenerator, RegressionDataGenerator
+from sklearn_mastery.data.generators import ClassificationDataGenerator, RegressionDataGenerator
 
 # Models
-from src.models.supervised.classification import RandomForestClassifierModel
-from src.models.supervised.regression import LinearRegressionModel
-from src.models.unsupervised.clustering import KMeansModel
+from sklearn_mastery.models.supervised.classification import RandomForestClassifierModel
+from sklearn_mastery.models.supervised.regression import LinearRegressionModel
+from sklearn_mastery.models.unsupervised.clustering import KMeansModel
 
 # Preprocessing
-from src.preprocessing.preprocessor import DataPreprocessor
-from src.pipelines.custom_transformers import ScalerTransformer, FeatureSelector
+from sklearn_mastery.preprocessing.preprocessor import DataPreprocessor
+from sklearn_mastery.pipelines.custom_transformers import ScalerTransformer, FeatureSelector
 
 # Evaluation
-from src.utils.evaluation import ModelEvaluator, CrossValidator
-from src.utils.visualization import DataVisualizer, ModelVisualizer
+from sklearn_mastery.utils.evaluation import ModelEvaluator, CrossValidator
+from sklearn_mastery.utils.visualization import DataVisualizer, ModelVisualizer
 ```
 
 ### Basic Usage Pattern

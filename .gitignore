@@ -141,4 +141,13 @@ logs/
 # Temporary files
 tmp/
 temp/
-.tmp/FILE_REJECTION_ANALYSIS.md
+.tmp/
+FILE_REJECTION_ANALYSIS.md
+
+# Local artefacts
+.ruff_cache/
+mlflow.db
+sample_data.csv
+sample_regression.csv
+profile_results.prof
+

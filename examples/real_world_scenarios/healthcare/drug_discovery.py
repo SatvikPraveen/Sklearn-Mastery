@@ -32,11 +32,11 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Framework imports
-from src.data.generators import DataGenerator
-from src.models.supervised.classification import ClassificationModels
-from src.models.supervised.regression import RegressionModels
-from src.models.ensemble.methods import EnsembleMethods
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.models.supervised.classification import ClassificationModels
+from sklearn_mastery.models.supervised.regression import RegressionModels
+from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
 from ..utilities.data_loaders import DataLoader

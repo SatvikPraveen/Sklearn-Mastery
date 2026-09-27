@@ -41,10 +41,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Project imports
-from src.data.generators import ClassificationDataGenerator
-from src.preprocessing.preprocessor import DataPreprocessor
-from src.preprocessing.validator import DataValidator
-from src.utils.visualization import DataVisualizer
+from sklearn_mastery.data.generators import ClassificationDataGenerator
+from sklearn_mastery.preprocessing.preprocessor import DataPreprocessor
+from sklearn_mastery.preprocessing.validator import DataValidator
+from sklearn_mastery.utils.visualization import DataVisualizer
 
 # Set style for better plots
 plt.style.use('seaborn-v0_8')
@@ -162,7 +162,7 @@ The project provides flexible missing value imputation strategies:
 ### Simple Imputation
 
 ```python
-from src.pipelines.custom_transformers import MissingValueImputer
+from sklearn_mastery.pipelines.custom_transformers import MissingValueImputer
 
 # Separate numerical and categorical columns
 numerical_cols = df.select_dtypes(include=[np.number]).columns.drop('target')
@@ -253,7 +253,7 @@ Outliers can significantly impact model performance. The project provides multip
 ### IQR Method
 
 ```python
-from src.pipelines.custom_transformers import OutlierRemover
+from sklearn_mastery.pipelines.custom_transformers import OutlierRemover
 
 # IQR-based outlier removal
 iqr_remover = OutlierRemover(method='iqr', threshold=1.5)
@@ -331,7 +331,7 @@ Feature scaling ensures all features contribute equally to model training:
 ### Standard Scaling (Z-score normalization)
 
 ```python
-from src.pipelines.custom_transformers import ScalerTransformer
+from sklearn_mastery.pipelines.custom_transformers import ScalerTransformer
 
 # Standard scaling
 standard_scaler = ScalerTransformer(method='standard')
@@ -415,7 +415,7 @@ Converting categorical variables to numerical format is essential for most ML al
 ### One-Hot Encoding
 
 ```python
-from src.pipelines.custom_transformers import CategoryEncoder
+from sklearn_mastery.pipelines.custom_transformers import CategoryEncoder
 
 # One-hot encoding for categorical features
 onehot_encoder = CategoryEncoder(method='onehot', columns=['income_category'])
@@ -516,7 +516,7 @@ Selecting relevant features improves model performance and reduces overfitting:
 ### Variance Threshold Selection
 
 ```python
-from src.pipelines.custom_transformers import VarianceThresholdSelector
+from sklearn_mastery.pipelines.custom_transformers import VarianceThresholdSelector
 
 # Remove low-variance features
 variance_selector = VarianceThresholdSelector(threshold=0.01)
@@ -536,7 +536,7 @@ print(f"Selected features: {selected_features.tolist()}")
 ### Correlation-Based Selection
 
 ```python
-from src.pipelines.custom_transformers import CorrelationSelector
+from sklearn_mastery.pipelines.custom_transformers import CorrelationSelector
 
 # Remove highly correlated features
 correlation_selector = CorrelationSelector(threshold=0.9)
@@ -564,7 +564,7 @@ plt.show()
 ### Univariate Feature Selection
 
 ```python
-from src.pipelines.custom_transformers import FeatureSelector
+from sklearn_mastery.pipelines.custom_transformers import FeatureSelector
 
 # Univariate feature selection based on statistical tests
 univariate_selector = FeatureSelector(method='univariate', k=5)
@@ -659,7 +659,7 @@ Transform features to improve model performance:
 ### Polynomial Features
 
 ```python
-from src.pipelines.custom_transformers import PolynomialFeatureGenerator
+from sklearn_mastery.pipelines.custom_transformers import PolynomialFeatureGenerator
 
 # Generate polynomial features
 poly_generator = PolynomialFeatureGenerator(degree=2, include_bias=False)
@@ -674,7 +674,7 @@ print(f"Added features: {X_poly.shape[1] - X_selected_univariate.shape[1]}")
 ### Interaction Features
 
 ```python
-from src.pipelines.custom_transformers import InteractionFeatureGenerator
+from sklearn_mastery.pipelines.custom_transformers import InteractionFeatureGenerator
 
 # Generate interaction features
 interaction_generator = InteractionFeatureGenerator(degree=2)
@@ -689,7 +689,7 @@ print(f"Interaction features: {X_interactions.shape[1] - X_selected_univariate.s
 ### Binning/Discretization
 
 ```python
-from src.pipelines.custom_transformers import BinningTransformer
+from sklearn_mastery.pipelines.custom_transformers import BinningTransformer
 
 # Bin continuous features
 binning_transformer = BinningTransformer(n_bins=5, strategy='uniform', encode='ordinal')
@@ -708,7 +708,7 @@ for i in range(len(bin_edges) - 1):
 ### Log Transformation
 
 ```python
-from src.pipelines.custom_transformers import LogTransformer
+from sklearn_mastery.pipelines.custom_transformers import LogTransformer
 
 # Apply log transformation (for positive features)
 # Make data positive by shifting

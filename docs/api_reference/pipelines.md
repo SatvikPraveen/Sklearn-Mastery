@@ -13,7 +13,7 @@ Complete API documentation for ML pipeline creation, custom transformers, and mo
 Factory class for creating complete ML pipelines with preprocessing and model training.
 
 ```python
-from src.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
 
 factory = PipelineFactory()
 ```
@@ -169,7 +169,7 @@ pipeline = factory.create_custom_pipeline(
 Select specific columns from pandas DataFrame.
 
 ```python
-from src.pipelines.custom_transformers import DataFrameSelector
+from sklearn_mastery.pipelines.custom_transformers import DataFrameSelector
 
 selector = DataFrameSelector(attribute_names=['feature1', 'feature2'])
 X_selected = selector.fit_transform(df)
@@ -180,7 +180,7 @@ X_selected = selector.fit_transform(df)
 Enhanced categorical encoding with multiple strategies.
 
 ```python
-from src.pipelines.custom_transformers import CategoricalEncoder
+from sklearn_mastery.pipelines.custom_transformers import CategoricalEncoder
 
 encoder = CategoricalEncoder(
     encoding_type='onehot',  # 'onehot', 'ordinal', 'target', 'binary'
@@ -202,7 +202,7 @@ X_encoded = encoder.fit_transform(X_categorical, y)
 Remove outliers using various detection methods.
 
 ```python
-from src.pipelines.custom_transformers import OutlierRemover
+from sklearn_mastery.pipelines.custom_transformers import OutlierRemover
 
 outlier_remover = OutlierRemover(
     method='isolation_forest',  # 'isolation_forest', 'local_outlier_factor', 'one_class_svm'
@@ -217,7 +217,7 @@ X_clean = outlier_remover.fit_transform(X)
 Generate new features through various transformations.
 
 ```python
-from src.pipelines.custom_transformers import FeatureGenerator
+from sklearn_mastery.pipelines.custom_transformers import FeatureGenerator
 
 feature_gen = FeatureGenerator(
     operations=['log', 'sqrt', 'square', 'interactions'],
@@ -242,7 +242,7 @@ X_enhanced = feature_gen.fit_transform(X)
 Transform time series data for ML algorithms.
 
 ```python
-from src.pipelines.custom_transformers import TimeSeriesTransformer
+from sklearn_mastery.pipelines.custom_transformers import TimeSeriesTransformer
 
 ts_transformer = TimeSeriesTransformer(
     lag_features=[1, 2, 3, 7],
@@ -259,7 +259,7 @@ X_ts = ts_transformer.fit_transform(time_series_data)
 Preprocess text data for ML pipelines.
 
 ```python
-from src.pipelines.custom_transformers import TextPreprocessor
+from sklearn_mastery.pipelines.custom_transformers import TextPreprocessor
 
 text_prep = TextPreprocessor(
     lowercase=True,
@@ -279,7 +279,7 @@ X_text = text_prep.fit_transform(text_data)
 Automated model selection and hyperparameter tuning.
 
 ```python
-from src.pipelines.model_selection import ModelSelector
+from sklearn_mastery.pipelines.model_selection import ModelSelector
 
 selector = ModelSelector(
     task_type='classification',  # 'classification', 'regression', 'clustering'
@@ -389,7 +389,7 @@ best_pipeline = selector.auto_select_best_model(
 Advanced hyperparameter optimization strategies.
 
 ```python
-from src.pipelines.model_selection import HyperparameterOptimizer
+from sklearn_mastery.pipelines.model_selection import HyperparameterOptimizer
 
 optimizer = HyperparameterOptimizer()
 ```
@@ -457,7 +457,7 @@ best_params = optimizer.optuna_optimization(
 Utility functions for pipeline operations.
 
 ```python
-from src.pipelines.utils import PipelineUtils
+from sklearn_mastery.pipelines.utils import PipelineUtils
 
 utils = PipelineUtils()
 ```
@@ -529,7 +529,7 @@ optimized_pipeline = utils.optimize_pipeline_memory(
 ### Multi-Target Pipeline
 
 ```python
-from src.pipelines.multi_target import MultiTargetPipeline
+from sklearn_mastery.pipelines.multi_target import MultiTargetPipeline
 
 multi_pipeline = MultiTargetPipeline(
     estimator=RandomForestRegressor(),
@@ -544,7 +544,7 @@ predictions = multi_pipeline.predict(X_test)
 ### Streaming Pipeline
 
 ```python
-from src.pipelines.streaming import StreamingPipeline
+from sklearn_mastery.pipelines.streaming import StreamingPipeline
 
 streaming_pipeline = StreamingPipeline(
     base_pipeline=pipeline,
@@ -562,7 +562,7 @@ for batch_X, batch_y in data_stream:
 ### Federated Pipeline
 
 ```python
-from src.pipelines.federated import FederatedPipeline
+from sklearn_mastery.pipelines.federated import FederatedPipeline
 
 fed_pipeline = FederatedPipeline(
     base_pipeline=pipeline,
@@ -583,9 +583,9 @@ final_model = fed_pipeline.aggregate_models()
 ### Complete Classification Pipeline
 
 ```python
-from src.pipelines.pipeline_factory import PipelineFactory
-from src.pipelines.model_selection import ModelSelector
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.pipelines.model_selection import ModelSelector
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Create pipeline factory
 factory = PipelineFactory()
@@ -628,7 +628,7 @@ print(f"Pipeline F1-Score: {metrics['f1_weighted']:.4f}")
 ### Automated Model Selection
 
 ```python
-from src.pipelines.model_selection import ModelSelector
+from sklearn_mastery.pipelines.model_selection import ModelSelector
 
 # Initialize selector
 selector = ModelSelector(task_type='classification')
@@ -656,7 +656,7 @@ print(f"Best CV score: {best_pipeline.score(X_test, y_test):.4f}")
 ### Custom Transformer Pipeline
 
 ```python
-from src.pipelines.custom_transformers import *
+from sklearn_mastery.pipelines.custom_transformers import *
 from sklearn.pipeline import Pipeline
 
 # Create custom pipeline with multiple transformers

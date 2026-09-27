@@ -17,7 +17,7 @@ Regression algorithms predict continuous numerical values. Our framework provide
 **Best for**: Linear relationships, interpretability, baseline models
 
 ```python
-from src.models.supervised.regression import RegressionModels
+from sklearn_mastery.models.supervised.regression import RegressionModels
 
 models = RegressionModels()
 linear_reg = models.get_linear_regression()
@@ -210,9 +210,9 @@ lasso = models.get_lasso_regression(
 ### Basic Regression Pipeline
 
 ```python
-from src.data.generators import DataGenerator
-from src.models.supervised.regression import RegressionModels
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.models.supervised.regression import RegressionModels
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Generate sample data
 generator = DataGenerator()
@@ -249,8 +249,8 @@ for name, metrics in results.items():
 ### Advanced Pipeline with Preprocessing
 
 ```python
-from src.pipelines.pipeline_factory import PipelineFactory
-from src.data.preprocessors import DataPreprocessor
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.data.preprocessors import DataPreprocessor
 
 # Create preprocessing pipeline
 preprocessor = DataPreprocessor()
@@ -285,7 +285,7 @@ if hasattr(pipeline.named_steps['model'], 'feature_importances_'):
 ### Grid Search Example
 
 ```python
-from src.pipelines.model_selection import ModelSelector
+from sklearn_mastery.pipelines.model_selection import ModelSelector
 
 selector = ModelSelector()
 
@@ -314,7 +314,7 @@ print("Best score:", best_model.best_score_)
 ### Bayesian Optimization
 
 ```python
-from src.pipelines.model_selection import BayesianOptimizer
+from sklearn_mastery.pipelines.model_selection import BayesianOptimizer
 
 optimizer = BayesianOptimizer()
 
@@ -343,7 +343,7 @@ print("Optimized parameters:", best_params)
 ### Regression Metrics Available
 
 ```python
-from src.evaluation.metrics import RegressionMetrics
+from sklearn_mastery.evaluation.metrics import RegressionMetrics
 
 metrics = RegressionMetrics()
 

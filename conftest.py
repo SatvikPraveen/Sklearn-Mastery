@@ -1,14 +1,25 @@
-"""Pytest configuration for sklearn-mastery."""
+"""Root pytest configuration: shared fixtures and deterministic seeding."""
 
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-# Add src directory to path for imports
-src_path = Path(__file__).parent.parent / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+import numpy as np
+import pytest
 
-# Ensure config is also available
-config_path = Path(__file__).parent.parent / "config"
-if str(config_path) not in sys.path:
-    sys.path.insert(0, str(config_path))
+
+@pytest.fixture(autouse=True)
+def _seed_numpy():
+    """Seed NumPy before every test so stochastic tests are reproducible."""
+    np.random.seed(42)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _headless_matplotlib(monkeypatch):
+    """Force a non-interactive matplotlib backend and close figures after tests."""
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    yield
+    import matplotlib.pyplot as plt
+
+    plt.close("all")

@@ -36,11 +36,11 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Project imports
-from src.data.generators import ClassificationDataGenerator, RegressionDataGenerator
-from src.models.supervised.classification import *
-from src.models.supervised.regression import *
-from src.utils.evaluation import ModelEvaluator, PerformanceComparator
-from src.utils.visualization import DataVisualizer, PerformanceVisualizer
+from sklearn_mastery.data.generators import ClassificationDataGenerator, RegressionDataGenerator
+from sklearn_mastery.models.supervised.classification import *
+from sklearn_mastery.models.supervised.regression import *
+from sklearn_mastery.utils.evaluation import ModelEvaluator, PerformanceComparator
+from sklearn_mastery.utils.visualization import DataVisualizer, PerformanceVisualizer
 
 # Set random seed for reproducibility
 np.random.seed(42)

@@ -2,7 +2,7 @@
 Updated tests for data generation utilities.
 
 This module contains comprehensive tests for the SyntheticDataGenerator
-in the src/data/generators.py module.
+in the sklearn_mastery/data/generators.py module.
 """
 
 import pytest
@@ -13,10 +13,8 @@ from unittest.mock import patch, MagicMock
 import sys
 import os
 
-# Add src to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from data.generators import SyntheticDataGenerator
+from sklearn_mastery.data.generators import SyntheticDataGenerator
 
 
 class TestSyntheticDataGenerator:

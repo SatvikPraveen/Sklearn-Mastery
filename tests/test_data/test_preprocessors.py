@@ -9,10 +9,8 @@ from sklearn.datasets import make_classification
 import sys
 import os
 
-# Add src to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from data.preprocessors import DataPreprocessor, CategoricalEncoder, NumericalTransformer
+from sklearn_mastery.data.preprocessors import DataPreprocessor, CategoricalEncoder, NumericalTransformer
 
 
 class TestDataPreprocessor:

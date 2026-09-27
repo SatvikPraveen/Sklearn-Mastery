@@ -147,11 +147,11 @@ pip install -r requirements.txt
 pip install -e .
 
 # 5. Verify installation
-python -c "import src; print('✅ Installation successful!')"
+python -c "import sklearn_mastery; print('✅ Installation successful!')"
 
 # 6. Test with a quick example
 python -c "
-from src.data.generators import SyntheticDataGenerator
+from sklearn_mastery.data.generators import SyntheticDataGenerator
 gen = SyntheticDataGenerator()
 X, y = gen.classification_complexity_spectrum('medium')
 print(f'✅ Generated dataset: {X.shape[0]} samples, {X.shape[1]} features')
@@ -226,9 +226,9 @@ pip install -r requirements-minimal.txt
 ### **30-Second Demo**
 
 ```python
-from src.data.generators import SyntheticDataGenerator
-from src.pipelines.pipeline_factory import PipelineFactory
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.data.generators import SyntheticDataGenerator
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # 🎯 Generate algorithm-optimized data
 generator = SyntheticDataGenerator(random_state=42)
@@ -277,7 +277,7 @@ Explore the project through **7 comprehensive Jupyter notebooks**:
 <summary><strong>Custom Transformers Library</strong></summary>
 
 ```python
-from src.pipelines.custom_transformers import *
+from sklearn_mastery.pipelines.custom_transformers import *
 
 # 🔍 Intelligent outlier detection
 outlier_remover = OutlierRemover(
@@ -310,7 +310,7 @@ imputer = AdvancedImputer(
 <summary><strong>Pipeline Factory Patterns</strong></summary>
 
 ```python
-from src.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
 
 factory = PipelineFactory(random_state=42)
 
@@ -355,7 +355,7 @@ production_pipeline = factory.create_production_pipeline(
 <summary><strong>Algorithm-Specific Datasets</strong></summary>
 
 ```python
-from src.data.generators import SyntheticDataGenerator
+from sklearn_mastery.data.generators import SyntheticDataGenerator
 
 generator = SyntheticDataGenerator(random_state=42)
 

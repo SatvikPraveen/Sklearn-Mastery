@@ -52,7 +52,7 @@ Logistic regression uses the logistic function to model the probability of class
 ### Implementation
 
 ```python
-from src.models.supervised.classification import LogisticRegressionModel
+from sklearn_mastery.models.supervised.classification import LogisticRegressionModel
 
 # Basic usage
 model = LogisticRegressionModel(
@@ -103,8 +103,8 @@ intercept = model.get_intercept()
 ### Example: Multi-class Classification
 
 ```python
-from src.data.generators import ClassificationDataGenerator
-from src.utils.evaluation import ModelEvaluator
+from sklearn_mastery.data.generators import ClassificationDataGenerator
+from sklearn_mastery.utils.evaluation import ModelEvaluator
 
 # Generate multi-class data
 generator = ClassificationDataGenerator()
@@ -144,7 +144,7 @@ Random Forest is an ensemble method that combines multiple decision trees using 
 ### Implementation
 
 ```python
-from src.models.supervised.classification import RandomForestClassifierModel
+from sklearn_mastery.models.supervised.classification import RandomForestClassifierModel
 
 # Configuration
 model = RandomForestClassifierModel(
@@ -229,7 +229,7 @@ SVMs find the optimal hyperplane that separates classes with the maximum margin.
 ### Implementation
 
 ```python
-from src.models.supervised.classification import SVMClassifierModel
+from sklearn_mastery.models.supervised.classification import SVMClassifierModel
 
 # Linear SVM
 linear_svm = SVMClassifierModel(
@@ -328,7 +328,7 @@ Gradient Boosting builds models sequentially, with each new model correcting err
 ### Implementation
 
 ```python
-from src.models.supervised.classification import GradientBoostingClassifierModel
+from sklearn_mastery.models.supervised.classification import GradientBoostingClassifierModel
 
 # Standard configuration
 model = GradientBoostingClassifierModel(
@@ -418,7 +418,7 @@ Multi-layer Perceptrons (MLPs) use multiple layers of neurons with non-linear ac
 ### Implementation
 
 ```python
-from src.models.supervised.classification import NeuralNetworkClassifierModel
+from sklearn_mastery.models.supervised.classification import NeuralNetworkClassifierModel
 
 # Basic MLP
 model = NeuralNetworkClassifierModel(
@@ -496,7 +496,7 @@ print("Best score:", grid_search.best_score_)
 ### Performance Comparison Framework
 
 ```python
-from src.utils.evaluation import PerformanceComparator
+from sklearn_mastery.utils.evaluation import PerformanceComparator
 from sklearn.model_selection import cross_val_score
 
 # Define models to compare
@@ -552,7 +552,7 @@ print(results_df.round(3))
 
 ```python
 from sklearn.pipeline import Pipeline
-from src.pipelines.custom_transformers import *
+from sklearn_mastery.pipelines.custom_transformers import *
 
 # Comprehensive preprocessing pipeline
 preprocessing_pipeline = Pipeline([

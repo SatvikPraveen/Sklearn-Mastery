@@ -184,7 +184,7 @@ class LogisticRegressionModel(ClassificationModel):
 
     Examples
     --------
-    >>> from src.models.supervised.classification import LogisticRegressionModel
+    >>> from sklearn_mastery.models.supervised.classification import LogisticRegressionModel
     >>> model = LogisticRegressionModel(C=1.0, random_state=42)
     >>> model.train(X_train, y_train)
     >>> predictions = model.predict(X_test)

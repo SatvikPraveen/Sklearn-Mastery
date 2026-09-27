@@ -17,7 +17,7 @@ Ensemble methods combine predictions from multiple models to create more robust 
 **Best for**: Combining diverse models, reducing variance, stable predictions
 
 ```python
-from src.models.ensemble.methods import EnsembleMethods
+from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
 
 ensemble = EnsembleMethods()
 voting_clf = ensemble.get_voting_classifier()
@@ -293,10 +293,10 @@ stacking_reg = ensemble.get_stacking_regressor(
 ### Complete Ensemble Pipeline
 
 ```python
-from src.data.generators import DataGenerator
-from src.models.ensemble.methods import EnsembleMethods
-from src.evaluation.metrics import ModelEvaluator
-from src.pipelines.model_selection import EnsembleSelector
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.pipelines.model_selection import EnsembleSelector
 
 # Generate data
 generator = DataGenerator()
@@ -386,7 +386,7 @@ for name, metrics in results.items():
 ### Hyperparameter Optimization for Ensembles
 
 ```python
-from src.pipelines.model_selection import EnsembleOptimizer
+from sklearn_mastery.pipelines.model_selection import EnsembleOptimizer
 
 optimizer = EnsembleOptimizer()
 
@@ -445,7 +445,7 @@ final_predictions = final_model.predict(X_test)
 ### Diversity Analysis
 
 ```python
-from src.evaluation.ensemble import DiversityAnalyzer
+from sklearn_mastery.evaluation.ensemble import DiversityAnalyzer
 
 analyzer = DiversityAnalyzer()
 

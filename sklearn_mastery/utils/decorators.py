@@ -3,17 +3,17 @@
 import sys
 from pathlib import Path as PathLib
 
-# Handle imports that work in both package and direct import contexts
-try:
-    from ..config.logging_config import get_logger
-except ImportError:
-    # Fallback for direct imports outside package context
-    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
-    from config.logging_config import get_logger
 
+from sklearn_mastery.config.logging_config import get_logger
 import time
 import functools
-import psutil
+try:
+    import psutil
+
+    HAS_PSUTIL = True
+except ImportError:  # pragma: no cover
+    psutil = None
+    HAS_PSUTIL = False
 import os
 from typing import Callable, Any, Optional, Dict
 import warnings
@@ -108,7 +108,7 @@ def save_plots_decorator(
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             import matplotlib.pyplot as plt
-            from ..utils.helpers import VisualizationUtils
+            from sklearn_mastery.utils.helpers import VisualizationUtils
             
             logger = get_logger('plots')
             

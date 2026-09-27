@@ -29,13 +29,13 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Framework imports
-from src.data.generators import DataGenerator
-from src.data.preprocessors import DataPreprocessor
-from src.models.supervised.classification import ClassificationModels
-from src.models.ensemble.methods import EnsembleMethods
-from src.pipelines.pipeline_factory import PipelineFactory
-from src.pipelines.model_selection import ModelSelector
-from src.evaluation.metrics import ModelEvaluator
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.data.preprocessors import DataPreprocessor
+from sklearn_mastery.models.supervised.classification import ClassificationModels
+from sklearn_mastery.models.ensemble.ensemble_methods import EnsembleMethods
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.pipelines.model_selection import ModelSelector
+from sklearn_mastery.evaluation.metrics import ModelEvaluator
 
 # Scenario-specific imports
 from ..utilities.data_loaders import DataLoader

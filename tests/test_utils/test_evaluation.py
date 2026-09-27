@@ -14,9 +14,8 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from evaluation import (
+from sklearn_mastery.evaluation import (
     ModelEvaluator,
     StatisticalTester,
     ValidationCurveAnalyzer,

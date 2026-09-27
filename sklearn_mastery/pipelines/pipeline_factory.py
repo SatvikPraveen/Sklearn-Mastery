@@ -3,31 +3,14 @@
 import sys
 from pathlib import Path
 
-# Handle imports that work in both package and direct import contexts
-try:
-    from ..config.settings import settings
-    from ..config.logging_config import LoggerMixin
-except ImportError:
-    # Fallback for direct imports outside package context
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from config.settings import settings
-    from config.logging_config import LoggerMixin
 
-try:
-    from .custom_transformers import (
-        OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
-        AdvancedImputer, FeatureScaler, PipelineDebugger
-    )
-    from .model_selection import AdvancedModelSelector
-except ImportError:
-    # Fallback for direct imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from pipelines.custom_transformers import (
-        OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
-        AdvancedImputer, FeatureScaler, PipelineDebugger
-    )
-    from pipelines.model_selection import AdvancedModelSelector
-
+from sklearn_mastery.config.settings import settings
+from sklearn_mastery.config.logging_config import LoggerMixin
+from .custom_transformers import (
+    OutlierRemover, FeatureInteractionCreator, DomainSpecificEncoder,
+    AdvancedImputer, FeatureScaler, PipelineDebugger
+)
+from .model_selection import AdvancedModelSelector
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Union, Any, Tuple

@@ -108,8 +108,8 @@ pip install -e .
 **5-minute quickstart**:
 
 ```python
-from src.data.generators import DataGenerator
-from src.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
 
 # Generate sample data
 generator = DataGenerator()
@@ -146,7 +146,7 @@ pipeline.fit(X, y)
 **Categorical features**:
 
 ```python
-from src.pipelines.custom_transformers import CategoricalEncoder
+from sklearn_mastery.pipelines.custom_transformers import CategoricalEncoder
 
 # Automatic handling in pipelines
 pipeline = factory.create_classification_pipeline(
@@ -170,7 +170,7 @@ pipeline = factory.create_classification_pipeline(
 **Built-in handling**:
 
 ```python
-from src.data.preprocessors import ImbalancedDataHandler
+from sklearn_mastery.data.preprocessors import ImbalancedDataHandler
 
 handler = ImbalancedDataHandler()
 X_balanced, y_balanced = handler.handle_imbalance(
@@ -195,7 +195,7 @@ pipeline = factory.create_classification_pipeline(
 **Automatic tuning**:
 
 ```python
-from src.pipelines.model_selection import ModelSelector
+from sklearn_mastery.pipelines.model_selection import ModelSelector
 
 selector = ModelSelector()
 best_model = selector.auto_select_best_model(
@@ -236,7 +236,7 @@ best_model = selector.bayesian_optimization(
 Yes! Extend the base classes:
 
 ```python
-from src.models.base import BaseModel
+from sklearn_mastery.models.base import BaseModel
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 class CustomClassifier(BaseModel, BaseEstimator, ClassifierMixin):
@@ -252,7 +252,7 @@ class CustomClassifier(BaseModel, BaseEstimator, ClassifierMixin):
         return predictions
 
 # Register with framework
-from src.models.supervised.classification import ClassificationModels
+from sklearn_mastery.models.supervised.classification import ClassificationModels
 ClassificationModels.register_custom_model('my_custom', CustomClassifier)
 ```
 
@@ -365,7 +365,7 @@ def predict():
 
 ```python
 # Chunked processing
-from src.data.utils import process_in_chunks
+from sklearn_mastery.data.utils import process_in_chunks
 
 results = process_in_chunks(
     large_dataset,
@@ -394,7 +394,7 @@ from scipy.sparse import csr_matrix
 X_sparse = csr_matrix(X)
 
 # Feature selection to reduce dimensionality
-from src.pipelines.custom_transformers import FeatureSelector
+from sklearn_mastery.pipelines.custom_transformers import FeatureSelector
 selector = FeatureSelector(method='univariate', k=1000)
 X_reduced = selector.fit_transform(X, y)
 ```

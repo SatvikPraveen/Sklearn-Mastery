@@ -13,7 +13,7 @@ Complete API documentation for data generation, preprocessing, and validation mo
 Core class for generating synthetic datasets for testing and development.
 
 ```python
-from src.data.generators import DataGenerator
+from sklearn_mastery.data.generators import DataGenerator
 
 generator = DataGenerator(random_state=42)
 ```
@@ -180,7 +180,7 @@ ts_data = generator.generate_time_series_data(
 Comprehensive data preprocessing pipeline.
 
 ```python
-from src.data.preprocessors import DataPreprocessor
+from sklearn_mastery.data.preprocessors import DataPreprocessor
 
 preprocessor = DataPreprocessor()
 ```
@@ -282,7 +282,7 @@ feature_names = preprocessor.get_feature_names()
 Validate data quality and integrity.
 
 ```python
-from src.data.validators import DataValidator
+from sklearn_mastery.data.validators import DataValidator
 
 validator = DataValidator()
 ```
@@ -362,7 +362,7 @@ is_valid, issues = validator.validate_pipeline_input(
 Generate text classification datasets.
 
 ```python
-from src.data.generators import TextDataGenerator
+from sklearn_mastery.data.generators import TextDataGenerator
 
 text_gen = TextDataGenerator()
 texts, labels = text_gen.generate_text_classification_data(
@@ -379,7 +379,7 @@ texts, labels = text_gen.generate_text_classification_data(
 Generate synthetic image datasets.
 
 ```python
-from src.data.generators import ImageDataGenerator
+from sklearn_mastery.data.generators import ImageDataGenerator
 
 image_gen = ImageDataGenerator()
 images, labels = image_gen.generate_image_classification_data(
@@ -395,7 +395,7 @@ images, labels = image_gen.generate_image_classification_data(
 Generate graph/network datasets.
 
 ```python
-from src.data.generators import GraphDataGenerator
+from sklearn_mastery.data.generators import GraphDataGenerator
 
 graph_gen = GraphDataGenerator()
 graphs, labels = graph_gen.generate_graph_classification_data(
@@ -413,7 +413,7 @@ graphs, labels = graph_gen.generate_graph_classification_data(
 Load built-in sample datasets.
 
 ```python
-from src.data.loaders import load_sample_datasets
+from sklearn_mastery.data.loaders import load_sample_datasets
 
 # Available datasets
 datasets = load_sample_datasets()
@@ -427,7 +427,7 @@ X_breast_cancer, y_breast_cancer = datasets['breast_cancer']
 Enhanced train-test splitting with stratification and validation sets.
 
 ```python
-from src.data.utils import create_train_test_split
+from sklearn_mastery.data.utils import create_train_test_split
 
 splits = create_train_test_split(
     X, y,
@@ -446,7 +446,7 @@ y_train, y_val, y_test = splits['y_train'], splits['y_val'], splits['y_test']
 Create custom cross-validation folds.
 
 ```python
-from src.data.utils import generate_cross_validation_folds
+from sklearn_mastery.data.utils import generate_cross_validation_folds
 
 cv_folds = generate_cross_validation_folds(
     X, y,
@@ -504,9 +504,9 @@ DEFAULT_PREPROCESSING_CONFIG = {
 ### Complete Data Pipeline
 
 ```python
-from src.data.generators import DataGenerator
-from src.data.preprocessors import DataPreprocessor
-from src.data.validators import DataValidator
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.data.preprocessors import DataPreprocessor
+from sklearn_mastery.data.validators import DataValidator
 
 # Generate data
 generator = DataGenerator(random_state=42)
@@ -533,7 +533,7 @@ X_processed = preprocessor.fit_transform(
 )
 
 # Create train/test splits
-from src.data.utils import create_train_test_split
+from sklearn_mastery.data.utils import create_train_test_split
 splits = create_train_test_split(
     X_processed, y,
     test_size=0.2,

@@ -31,7 +31,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Framework imports
-from src.data.generators import DataGenerator
+from sklearn_mastery.data.generators import DataGenerator
 
 # Scenario-specific imports
 from ..utilities.data_loaders import DataLoader

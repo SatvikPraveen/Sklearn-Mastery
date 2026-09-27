@@ -16,9 +16,8 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from pipelines.pipeline_factory import (
+from sklearn_mastery.pipelines.pipeline_factory import (
     PipelineFactory,
     AutoMLPipelineBuilder,
     ClassificationPipelineFactory,

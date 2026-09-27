@@ -45,7 +45,7 @@ pip install -e .
 
 ```python
 # Test the installation
-python -c "from src.models.supervised.classification import LogisticRegressionModel; print('Installation successful!')"
+python -c "from sklearn_mastery.models.supervised.classification import LogisticRegressionModel; print('Installation successful!')"
 ```
 
 ## Project Structure
@@ -82,10 +82,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Project imports
-from src.data.generators import ClassificationDataGenerator
-from src.models.supervised.classification import LogisticRegressionModel
-from src.utils.evaluation import ModelEvaluator
-from src.utils.visualization import DataVisualizer, ModelVisualizer
+from sklearn_mastery.data.generators import ClassificationDataGenerator
+from sklearn_mastery.models.supervised.classification import LogisticRegressionModel
+from sklearn_mastery.utils.evaluation import ModelEvaluator
+from sklearn_mastery.utils.visualization import DataVisualizer, ModelVisualizer
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -247,7 +247,7 @@ print(f"Model intercept: {lr_model.model.intercept_}")
 ### Random Forest
 
 ```python
-from src.models.supervised.classification import RandomForestClassifierModel
+from sklearn_mastery.models.supervised.classification import RandomForestClassifierModel
 
 # Create and train random forest model
 rf_model = RandomForestClassifierModel(
@@ -433,9 +433,9 @@ Here's a template you can use for future projects:
 
 ```python
 # Quick Start Template
-from src.data.generators import ClassificationDataGenerator
-from src.models.supervised.classification import LogisticRegressionModel
-from src.utils.evaluation import ModelEvaluator
+from sklearn_mastery.data.generators import ClassificationDataGenerator
+from sklearn_mastery.models.supervised.classification import LogisticRegressionModel
+from sklearn_mastery.utils.evaluation import ModelEvaluator
 import numpy as np
 
 # Set random seed

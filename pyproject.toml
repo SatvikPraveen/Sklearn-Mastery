@@ -1,0 +1,122 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sklearn-mastery"
+version = "2.0.0"
+description = "Research-grade toolkit for reproducible machine-learning experiments with scikit-learn"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Satvik Praveen", email = "satvikpraveen707@gmail.com" }]
+maintainers = [{ name = "Satvik Praveen", email = "satvikpraveen707@gmail.com" }]
+keywords = ["scikit-learn", "machine-learning", "benchmarking", "statistical-testing", "reproducibility"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=1.23",
+  "pandas>=1.5",
+  "scipy>=1.9",
+  "scikit-learn>=1.3",
+  "joblib>=1.3",
+  "matplotlib>=3.5",
+  "seaborn>=0.12",
+  "pydantic>=2.0",
+  "pydantic-settings>=2.0",
+  "click>=8.1",
+  "tqdm>=4.65",
+]
+
+[project.optional-dependencies]
+boosting = ["xgboost>=1.7", "lightgbm>=3.3"]
+imbalanced = ["imbalanced-learn>=0.10"]
+interpret = ["shap>=0.42", "lime>=0.2"]
+tuning = ["optuna>=3.2"]
+tracking = ["mlflow>=2.5"]
+viz = ["plotly>=5.15"]
+notebooks = ["jupyter>=1.0", "ipywidgets>=8.0", "umap-learn>=0.5.3"]
+all = [
+  "sklearn-mastery[boosting,imbalanced,interpret,tuning,tracking,viz,notebooks]",
+]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "pytest-xdist>=3.3",
+  "ruff>=0.4",
+  "mypy>=1.8",
+  "pre-commit>=3.3",
+  "pandas-stubs",
+  "plotly>=5.15",
+  "imbalanced-learn>=0.10",
+]
+docs = ["mkdocs>=1.5", "mkdocs-material>=9.0", "mkdocstrings[python]>=0.24"]
+
+[project.urls]
+Homepage = "https://github.com/SatvikPraveen/Sklearn-Mastery"
+Repository = "https://github.com/SatvikPraveen/Sklearn-Mastery"
+Issues = "https://github.com/SatvikPraveen/Sklearn-Mastery/issues"
+
+[project.scripts]
+sklearn-mastery = "sklearn_mastery.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sklearn_mastery*"]
+
+[tool.setuptools.package-data]
+sklearn_mastery = ["config/*.yaml", "py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "slow: long-running tests (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+  "ignore::DeprecationWarning:sklearn.*",
+  "ignore::FutureWarning",
+]
+
+[tool.coverage.run]
+source = ["sklearn_mastery"]
+branch = true
+omit = ["sklearn_mastery/cli.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+extend-exclude = ["notebooks", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY", "RUF"]
+ignore = ["E501", "B008", "B905", "RUF012", "UP007", "UP006", "UP035", "UP045", "RUF005", "B007", "RUF015", "B028"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B", "NPY", "RUF"]
+"__init__.py" = ["F401", "F403"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sklearn_mastery"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_ignores = false
+no_implicit_optional = false
+files = ["sklearn_mastery"]

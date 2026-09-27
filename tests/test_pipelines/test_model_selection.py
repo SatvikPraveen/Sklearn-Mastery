@@ -18,9 +18,8 @@ import os
 import time
 
 # Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from pipelines.model_selection import (
+from sklearn_mastery.pipelines.model_selection import (
     ModelSelectionPipeline,
     AutoModelSelector,
     ModelComparator,

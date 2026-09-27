@@ -14,9 +14,8 @@ import os
 import tempfile
 
 # Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from models.supervised.regression import (
+from sklearn_mastery.models.supervised.regression import (
     RegressionModel,
     LinearRegressionModel,
     RidgeRegressionModel,

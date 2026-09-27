@@ -17,7 +17,7 @@ Clustering algorithms group similar data points without labeled targets. Our fra
 **Best for**: Spherical clusters, known number of clusters, large datasets
 
 ```python
-from src.models.unsupervised.clustering import ClusteringModels
+from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
 
 models = ClusteringModels()
 kmeans = models.get_kmeans()
@@ -202,9 +202,9 @@ meanshift = models.get_mean_shift(
 ### Basic Clustering Pipeline
 
 ```python
-from src.data.generators import DataGenerator
-from src.models.unsupervised.clustering import ClusteringModels
-from src.evaluation.metrics import ClusteringEvaluator
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
+from sklearn_mastery.evaluation.metrics import ClusteringEvaluator
 
 # Generate sample data
 generator = DataGenerator()
@@ -247,7 +247,7 @@ for name, metrics in results.items():
 ### Optimal Cluster Number Detection
 
 ```python
-from src.evaluation.utils import OptimalClusters
+from sklearn_mastery.evaluation.utils import OptimalClusters
 
 # Elbow method for K-Means
 optimal_k = OptimalClusters()
@@ -322,7 +322,7 @@ print(f"Outliers: {list(labels).count(-1)}")
 ### Ensemble Clustering
 
 ```python
-from src.models.ensemble.clustering import EnsembleClustering
+from sklearn_mastery.models.ensemble.clustering import EnsembleClustering
 
 # Combine multiple clustering algorithms
 ensemble = EnsembleClustering()
@@ -347,7 +347,7 @@ evidence_labels = ensemble.evidence_accumulation(
 ### Dimensionality Reduction + Clustering
 
 ```python
-from src.models.unsupervised.dimensionality_reduction import DimensionalityReduction
+from sklearn_mastery.models.unsupervised.dimensionality_reduction import DimensionalityReduction
 
 # Reduce dimensions before clustering
 dim_reducer = DimensionalityReduction()
@@ -389,7 +389,7 @@ labels = fcluster(linkage_matrix, t=4, criterion='maxclust')
 ### Internal Metrics (No Ground Truth)
 
 ```python
-from src.evaluation.metrics import ClusteringMetrics
+from sklearn_mastery.evaluation.metrics import ClusteringMetrics
 
 metrics = ClusteringMetrics()
 
@@ -433,7 +433,7 @@ print(f"V-Measure: {v_measure:.3f}")
 ### Cluster Visualization
 
 ```python
-from src.evaluation.visualization import ClusteringVisualizer
+from sklearn_mastery.evaluation.visualization import ClusteringVisualizer
 
 visualizer = ClusteringVisualizer()
 

@@ -30,10 +30,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Framework imports
-from src.data.generators import DataGenerator
-from src.models.unsupervised.clustering import ClusteringModels
-from src.evaluation.metrics import ClusteringEvaluator
-from src.pipelines.pipeline_factory import PipelineFactory
+from sklearn_mastery.data.generators import DataGenerator
+from sklearn_mastery.models.unsupervised.clustering import ClusteringModels
+from sklearn_mastery.evaluation.metrics import ClusteringEvaluator
+from sklearn_mastery.pipelines.pipeline_factory import PipelineFactory
 
 # Scenario-specific imports
 from ..utilities.data_loaders import DataLoader

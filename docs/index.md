@@ -9,9 +9,9 @@ This project provides a complete ecosystem for learning and applying machine lea
 ## Quick Start
 
 ```python
-from src.models.supervised.classification import RandomForestClassifierModel
-from src.data.generators import ClassificationDataGenerator
-from src.utils.evaluation import ModelEvaluator
+from sklearn_mastery.models.supervised.classification import RandomForestClassifierModel
+from sklearn_mastery.data.generators import ClassificationDataGenerator
+from sklearn_mastery.utils.evaluation import ModelEvaluator
 
 # Generate sample data
 generator = ClassificationDataGenerator()
@@ -148,8 +148,8 @@ pytest >= 6.0.0
 
 ```python
 from sklearn.pipeline import Pipeline
-from src.pipelines.custom_transformers import ScalerTransformer, FeatureSelector
-from src.models.supervised.classification import RandomForestClassifierModel
+from sklearn_mastery.pipelines.custom_transformers import ScalerTransformer, FeatureSelector
+from sklearn_mastery.models.supervised.classification import RandomForestClassifierModel
 
 # Create pipeline
 pipeline = Pipeline([
@@ -166,8 +166,8 @@ accuracy = pipeline.score(X_test, y_test)
 ### Ensemble Learning
 
 ```python
-from src.models.ensemble.ensemble_methods import VotingEnsemble
-from src.models.supervised.classification import *
+from sklearn_mastery.models.ensemble.ensemble_methods import VotingEnsemble
+from sklearn_mastery.models.supervised.classification import *
 
 # Create ensemble
 estimators = [
@@ -184,7 +184,7 @@ predictions = ensemble.predict(X_test)
 ### Feature Engineering
 
 ```python
-from src.pipelines.custom_transformers import *
+from sklearn_mastery.pipelines.custom_transformers import *
 
 # Advanced preprocessing pipeline
 preprocessor = Pipeline([

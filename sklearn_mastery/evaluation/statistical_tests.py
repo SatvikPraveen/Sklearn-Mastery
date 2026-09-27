@@ -3,16 +3,9 @@
 import sys
 from pathlib import Path
 
-# Handle imports that work in both package and direct import contexts
-try:
-    from ..config.settings import settings
-    from ..config.logging_config import LoggerMixin
-except ImportError:
-    # Fallback for direct imports outside package context
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from config.settings import settings
-    from config.logging_config import LoggerMixin
 
+from sklearn_mastery.config.settings import settings
+from sklearn_mastery.config.logging_config import LoggerMixin
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Union, Tuple, Any
