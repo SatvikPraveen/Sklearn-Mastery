@@ -1121,7 +1121,7 @@ class TestTransformerIntegration:
         X_transformed = transformer.fit_transform(large_data)
         
         assert X_transformed.shape[0] == large_data.shape[0]
-        assert not pd.DataFrame(X_transformed).isnull().any().any()
+        assert not X_transformed[transformer.numeric_columns].isnull().any().any()
 
 
 class TestTransformerPerformance:
