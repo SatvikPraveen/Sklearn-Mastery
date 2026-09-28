@@ -204,9 +204,12 @@ class BusinessVisualizer:
         # 1. Historical vs Predicted Sales
         if 'time_series' in forecast_data:
             data = forecast_data['time_series']
-            axes[0, 0].plot(data['dates'], data['actual'], label='Actual', color=self.colors['primary'])
-            axes[0, 0].plot(data['dates'], data['predicted'], label='Predicted', color=self.colors['warning'], linestyle='--')
-            axes[0, 0].fill_between(data['dates'], data['lower_bound'], data['upper_bound'], 
+            # matplotlib does not accept raw pandas Timestamp objects on every
+            # pandas/matplotlib combination; datetime64 arrays are always safe.
+            dates = pd.to_datetime(pd.Index(data['dates'])).to_numpy()
+            axes[0, 0].plot(dates, data['actual'], label='Actual', color=self.colors['primary'])
+            axes[0, 0].plot(dates, data['predicted'], label='Predicted', color=self.colors['warning'], linestyle='--')
+            axes[0, 0].fill_between(dates, data['lower_bound'], data['upper_bound'], 
                                    alpha=0.3, color=self.colors['warning'], label='Confidence Interval')
             axes[0, 0].set_title('Sales Forecast vs Actual')
             axes[0, 0].set_ylabel('Sales ($)')

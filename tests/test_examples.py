@@ -2,7 +2,8 @@
 
 These tests are marked ``slow`` (deselect with ``-m "not slow"``). Each script
 under ``examples/real_world_scenarios/<domain>/`` is executed in a fresh
-interpreter with ``MPLBACKEND=Agg`` and a 300 s timeout; a script passes when
+interpreter with ``MPLBACKEND=Agg`` and a 300 s timeout (override with
+``SKLEARN_MASTERY_SCRIPT_TIMEOUT``); a script passes when
 its exit code is 0. Scripts save their figures under ``<repo>/results`` and
 never open a window, so the suite runs on CI and over SSH.
 """
@@ -19,7 +20,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = REPO_ROOT / "examples" / "real_world_scenarios"
-SCRIPT_TIMEOUT_SECONDS = 300
+SCRIPT_TIMEOUT_SECONDS = int(os.environ.get("SKLEARN_MASTERY_SCRIPT_TIMEOUT", "300"))
 
 
 def _discover_example_scripts() -> List[Path]:
