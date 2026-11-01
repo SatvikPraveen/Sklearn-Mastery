@@ -5,7 +5,7 @@
 #   docker run --rm -p 8888:8888 -v "$PWD:/workspace" sklearn-mastery \
 #       sklearn-mastery launch-notebooks --port 8888
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
